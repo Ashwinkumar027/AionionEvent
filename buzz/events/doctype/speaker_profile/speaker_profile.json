@@ -1,0 +1,121 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "autoincrement",
+ "creation": "2025-07-19 11:58:20.573125",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "display_name",
+  "column_break_dbuw",
+  "display_image",
+  "section_break_kmlw",
+  "designation",
+  "column_break_azvu",
+  "company",
+  "section_break_pvjm",
+  "social_media_links"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_dbuw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "user.full_name",
+   "fieldname": "display_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Display Name"
+  },
+  {
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Designation"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Company"
+  },
+  {
+   "fieldname": "display_image",
+   "fieldtype": "Attach Image",
+   "label": "Display Image"
+  },
+  {
+   "fieldname": "section_break_kmlw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_azvu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_pvjm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "social_media_links",
+   "fieldtype": "Table",
+   "label": "Social Media Links",
+   "options": "Social Media Link"
+  }
+ ],
+ "grid_page_length": 50,
+ "image_field": "display_image",
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-27 15:00:22.785410",
+ "modified_by": "Administrator",
+ "module": "Events",
+ "name": "Speaker Profile",
+ "naming_rule": "Autoincrement",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Event Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "display_name"
+}

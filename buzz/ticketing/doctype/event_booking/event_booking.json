@@ -1,0 +1,301 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-07-22 19:39:32.418375",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "event",
+  "column_break_cjxu",
+  "user",
+  "naming_series",
+  "section_break_status",
+  "payment_status",
+  "column_break_status",
+  "status",
+  "payment_method_section",
+  "payment_method",
+  "column_break_payment_method",
+  "offline_payment_method",
+  "section_break_xvkp",
+  "attendees",
+  "section_break_suav",
+  "additional_fields",
+  "section_break_tsys",
+  "net_amount",
+  "tax_percentage",
+  "tax_label",
+  "tax_amount",
+  "column_break_naeh",
+  "total_amount",
+  "currency",
+  "coupon_code",
+  "discount_amount",
+  "section_break_sdfp",
+  "amended_from",
+  "marketing_tab",
+  "utm_parameters"
+ ],
+ "fields": [
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Event Booking",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_sdfp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_xvkp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "attendees",
+   "fieldtype": "Table",
+   "label": "Attendees",
+   "options": "Event Booking Attendee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Event",
+   "options": "Buzz Event",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_cjxu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_tsys",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount",
+   "non_negative": 1,
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_naeh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "INR",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "tax_percentage",
+   "fieldtype": "Percent",
+   "label": "Tax Percentage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tax_label",
+   "fieldtype": "Data",
+   "label": "Tax Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tax_amount",
+   "fieldtype": "Currency",
+   "label": "Tax Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_suav",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "additional_fields",
+   "fieldtype": "Table",
+   "label": "Additional Fields",
+   "options": "Additional Field"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "B.###"
+  },
+  {
+   "fieldname": "marketing_tab",
+   "fieldtype": "Tab Break",
+   "label": "Marketing"
+  },
+  {
+   "fieldname": "utm_parameters",
+   "fieldtype": "Table",
+   "label": "UTM Parameters",
+   "options": "UTM Parameter",
+   "read_only": 1
+  },
+  {
+   "fieldname": "coupon_code",
+   "fieldtype": "Link",
+   "label": "Coupon Code",
+   "options": "Buzz Coupon Code"
+  },
+  {
+   "fieldname": "discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Unpaid",
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Payment Status",
+   "options": "Unpaid\nPaid\nVerification Pending",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Approval Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Confirmed\nApproval Pending\nApproved\nRejected",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_method_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Method"
+  },
+  {
+   "fieldname": "payment_method",
+   "fieldtype": "Data",
+   "label": "Payment Method",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_payment_method",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.payment_method === 'Offline'",
+   "fieldname": "offline_payment_method",
+   "fieldtype": "Data",
+   "label": "Offline Payment Method",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Event Ticket",
+   "link_fieldname": "booking"
+  },
+  {
+   "link_doctype": "Event Payment",
+   "link_fieldname": "reference_docname"
+  }
+ ],
+ "modified": "2026-02-05 09:10:22.542973",
+ "modified_by": "Administrator",
+ "module": "Ticketing",
+ "name": "Event Booking",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Event Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buzz User",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "event,total_amount,currency",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "user"
+}

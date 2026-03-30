@@ -1,0 +1,3 @@
+[submodule "dashboard/frappe-ui"]
+	path = dashboard/frappe-ui
+	url = https://github.com/frappe/frappe-ui.git

@@ -1,0 +1,73 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-26 12:59:48.053719",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "attendee_name",
+  "section_break_rejz",
+  "add_ons"
+ ],
+ "fields": [
+  {
+   "fieldname": "add_ons",
+   "fieldtype": "Table",
+   "label": "Add ons",
+   "options": "Ticket Add-on Value"
+  },
+  {
+   "fieldname": "section_break_rejz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fetch_from": "attendee.full_name",
+   "fieldname": "attendee_name",
+   "fieldtype": "Data",
+   "label": "Attendee Name",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-08-10 14:17:52.755675",
+ "modified_by": "Administrator",
+ "module": "Ticketing",
+ "name": "Attendee Ticket Add-on",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Event Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "read_only": 1,
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "attendee_name"
+}

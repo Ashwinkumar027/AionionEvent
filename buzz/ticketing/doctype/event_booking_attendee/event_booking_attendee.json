@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-22 19:41:54.837428",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "first_name",
+  "last_name",
+  "full_name",
+  "ticket_type",
+  "custom_fields",
+  "column_break_xmfr",
+  "email",
+  "phone",
+  "amount",
+  "currency",
+  "add_ons",
+  "number_of_add_ons",
+  "add_on_total"
+ ],
+ "fields": [
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "First Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "label": "Last Name"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Full Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_xmfr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ticket_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Ticket Type",
+   "options": "Event Ticket Type",
+   "reqd": 1
+  },
+  {
+   "default": "INR",
+   "fetch_from": "ticket_type.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "ticket_type.price",
+   "fetch_if_empty": 1,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "non_negative": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "add_ons",
+   "fieldtype": "Link",
+   "label": "Add Ons",
+   "options": "Attendee Ticket Add-on"
+  },
+  {
+   "fieldname": "add_on_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Add On Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "number_of_add_ons",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Number of Add Ons",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_fields",
+   "fieldtype": "JSON",
+   "label": "Custom Fields"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Phone"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-30 10:25:09.828552",
+ "modified_by": "Administrator",
+ "module": "Ticketing",
+ "name": "Event Booking Attendee",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,160 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-26 11:59:34.416282",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "submitted_by",
+  "column_break_esac",
+  "status",
+  "event",
+  "section_break_yqfb",
+  "description",
+  "column_break_kemm",
+  "speakers",
+  "section_break_ouiw",
+  "phone",
+  "section_break_additional",
+  "additional_fields"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "submitted_by",
+   "fieldtype": "Link",
+   "label": "Submitted By",
+   "options": "User"
+  },
+  {
+   "fieldname": "column_break_esac",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Review Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Review Pending\nShortlisted\nAccepted\nRejected"
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Event",
+   "options": "Buzz Event",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_yqfb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_kemm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "speakers",
+   "fieldtype": "Table",
+   "label": "Speakers",
+   "options": "Proposal Speaker",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_ouiw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Phone",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "section_break_additional",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "additional_fields",
+   "fieldtype": "Table",
+   "label": "Additional Fields",
+   "options": "Additional Field"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Event Talk",
+   "link_fieldname": "proposal"
+  }
+ ],
+ "modified": "2026-03-23 17:28:23.254661",
+ "modified_by": "Administrator",
+ "module": "Proposals",
+ "name": "Talk Proposal",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Event Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buzz User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Green",
+   "title": "Accepted"
+  }
+ ],
+ "title_field": "title",
+ "track_changes": 1,
+ "track_seen": 1,
+ "track_views": 1
+}

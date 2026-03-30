@@ -1,0 +1,115 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2025-07-19 11:35:15.182035",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "address",
+  "column_break_kqaw",
+  "type",
+  "google_maps_embed_code",
+  "section_break_cexp",
+  "longitude",
+  "latitude",
+  "column_break_xfsv",
+  "location"
+ ],
+ "fields": [
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Geolocation",
+   "label": "Location",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_kqaw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.type===\"Open Street Map\"",
+   "fieldname": "section_break_cexp",
+   "fieldtype": "Section Break",
+   "label": "Open Street Map"
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "9"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "9"
+  },
+  {
+   "fieldname": "column_break_xfsv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "Embed Google Maps\nOpen Street Map"
+  },
+  {
+   "depends_on": "eval:doc.type===\"Embed Google Maps\"",
+   "description": "Open a place on Google maps then click on share",
+   "fieldname": "google_maps_embed_code",
+   "fieldtype": "Code",
+   "label": "Google Maps Embed Code",
+   "options": "HTML"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 10:08:41.169559",
+ "modified_by": "Administrator",
+ "module": "Events",
+ "name": "Event Venue",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Event Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "quick_entry": 1,
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
