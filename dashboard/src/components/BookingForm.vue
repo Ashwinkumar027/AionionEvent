@@ -3,6 +3,16 @@
 	<div>
 		<EventDetailsHeader :event-details="eventDetails" />
 
+		<!-- PayU Bolt inline checkout (no page redirect) -->
+		<PayUBoltDialog
+			v-if="showPayUBolt"
+			:booking-id="pendingPayUBookingId"
+			:payment-gateway="pendingPayUGateway"
+			@payment-success="onPayUSuccess"
+			@payment-failure="onPayUFailure"
+			@close="showPayUBolt = false"
+		/>
+
 		<!-- Payment Gateway Selection Dialog -->
 		<PaymentGatewayDialog
 			v-model:open="showGatewayDialog"
@@ -432,6 +442,7 @@ import CustomFieldsSection from "./CustomFieldsSection.vue";
 import EventDetailsHeader from "./EventDetailsHeader.vue";
 import OfflinePaymentDialog from "./OfflinePaymentDialog.vue";
 import PaymentGatewayDialog from "./PaymentGatewayDialog.vue";
+import PayUBoltDialog from "./PayUBoltDialog.vue";
 
 // Refs to AttendeeFormControl instances (for calling validatePhone)
 const attendeeFormRefs = ref({});
@@ -526,6 +537,11 @@ const showGatewayDialog = ref(false);
 const showOfflineDialog = ref(false);
 const pendingPayload = ref(null);
 const selectedGateway = ref(null);
+
+// PayU Bolt inline checkout state
+const showPayUBolt = ref(false);
+const pendingPayUBookingId = ref(null);
+const pendingPayUGateway = ref(null);
 
 const isOfflineGateway = (gateway) => props.offlineMethods.some((m) => m.title === gateway);
 
@@ -1319,24 +1335,43 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 					clearOtpState();
 				}
 
-		        if (data.payment_link) {
+				// ── PayU Bolt path (no payment_link returned) ──────────────────
+				// When the gateway is PayU the backend skips get_payment_link and
+				// returns only { booking_name }.  We detect this by checking the
+				// gateway name and the absence of a payment_link.
+				const isPayUGateway =
+					paymentGateway &&
+					["payu", "payu money", "payumoney"].includes(
+						paymentGateway.toLowerCase()
+					);
 
-					// PayU returns HTML form
+				if (isPayUGateway && !data.payment_link && data.booking_name) {
+					pendingPayUBookingId.value = data.booking_name;
+					pendingPayUGateway.value = paymentGateway || null;
+					showPayUBolt.value = true;
+					return;
+				}
+
+				if (data.payment_link) {
+					// Legacy path: PayU returns HTML form → intercept and use Bolt
 					if (
 						data.payment_link.startsWith("<html") ||
 						data.payment_link.includes("<form")
 					) {
-						const payuPage = document.open("text/html", "replace");
-						payuPage.write(data.payment_link);
-						payuPage.close();
+						if (data.booking_name) {
+							pendingPayUBookingId.value = data.booking_name;
+							pendingPayUGateway.value = paymentGateway || null;
+							showPayUBolt.value = true;
+						} else {
+							const payuPage = document.open("text/html", "replace");
+							payuPage.write(data.payment_link);
+							payuPage.close();
+						}
+						return;
 					}
-					
 
-					// Razorpay returns URL
-					else {
-						window.location.href = data.payment_link;
-					}
-
+					// Other gateways (Razorpay, etc.) return a plain URL
+					window.location.href = data.payment_link;
 					return;
 				}
 
@@ -1479,4 +1514,16 @@ const submitButtonText = computed(() => {
 
 	return __("Book Tickets");
 });
+
+// ── PayU Bolt event handlers ─────────────────────────────────────────────────
+function onPayUSuccess({ bookingId }) {
+	showPayUBolt.value = false;
+	clearBookingCache();
+	router.replace(`/bookings/${bookingId}?success=true`);
+}
+
+function onPayUFailure({ message }) {
+	showPayUBolt.value = false;
+	toast.error(message || __("Payment failed. Please try again."));
+}
 </script>

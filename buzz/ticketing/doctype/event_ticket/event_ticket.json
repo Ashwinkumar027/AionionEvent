@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "hash",
+ "autoname": "evt-.######",
  "creation": "2025-07-22 19:49:30.385500",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -119,7 +119,7 @@
    "fieldname": "coupon_used",
    "fieldtype": "Link",
    "label": "Coupon Used ",
-   "options": "Bulk Ticket Coupon"
+   "options": "Buzz Coupon Code"
   },
   {
    "fieldname": "section_break_ijdn",
@@ -142,11 +142,11 @@
    "link_fieldname": "ticket"
   }
  ],
- "modified": "2025-12-30 13:25:40.498434",
+ "modified": "2026-03-31 10:34:04.447245",
  "modified_by": "Administrator",
  "module": "Ticketing",
  "name": "Event Ticket",
- "naming_rule": "Random",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

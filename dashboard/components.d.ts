@@ -30,6 +30,7 @@ declare module 'vue' {
     Navbar: typeof import('./src/components/Navbar.vue')['default']
     OfflinePaymentDialog: typeof import('./src/components/OfflinePaymentDialog.vue')['default']
     PaymentGatewayDialog: typeof import('./src/components/PaymentGatewayDialog.vue')['default']
+    PayUBoltDialog: typeof import('./src/components/PayUBoltDialog.vue')['default']
     PhoneInput: typeof import('./src/components/PhoneInput.vue')['default']
     ProfileView: typeof import('./src/components/ProfileView.vue')['default']
     ProposalEditDialog: typeof import('./src/components/ProposalEditDialog.vue')['default']
