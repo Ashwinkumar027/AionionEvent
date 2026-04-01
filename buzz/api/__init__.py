@@ -1,3 +1,4 @@
+import hashlib
 import os
 from base64 import b32encode
 
@@ -328,6 +329,7 @@ def get_event_booking_data(event_route: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
+@rate_limit(limit=4, seconds=60)
 def process_booking(
 	attendees: list[dict],
 	event: str,
@@ -1378,25 +1380,98 @@ def register_campaign_interest(campaign: str):
 # PayU Bolt (inline checkout) – hash generation
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# PayU Bolt (inline checkout) – stable hash generation & server-side verify
+# ---------------------------------------------------------------------------
+
+_PAYU_VERIFY_TEST = "https://sandboxsecure.payu.in/merchant/postservice?form=2"
+_PAYU_VERIFY_PROD = "https://secure.payu.in/merchant/postservice?form=2"
+
+
+def _get_payu_settings():
+	"""Return (payu_settings_doc, merchant_key, merchant_salt, is_test)."""
+	try:
+		payu_settings = frappe.get_cached_doc("PayU Settings")
+	except Exception:
+		frappe.throw(
+			_("PayU Settings not found. Please configure PayU Settings in the system.")
+		)
+
+	merchant_key = (payu_settings.get("merchant_key") or payu_settings.get("api_key") or "").strip()
+	merchant_salt = (
+		payu_settings.get_password("merchant_salt")
+		or payu_settings.get_password("api_secret")
+		or ""
+	).strip()
+	is_test = bool(payu_settings.get("sandbox") or payu_settings.get("test_mode"))
+
+	if not merchant_key or not merchant_salt:
+		frappe.throw(_("PayU merchant key / salt is not configured in PayU Settings"))
+
+	return payu_settings, merchant_key, merchant_salt, is_test
+
+
+def _compute_forward_hash(
+	merchant_key, txnid, amount, productinfo, firstname, email, merchant_salt
+):
+	"""SHA-512 forward hash: key|txnid|amount|productinfo|firstname|email|udf1-5||||||SALT"""
+	seq = f"{merchant_key}|{txnid}|{amount}|{productinfo}|{firstname}|{email}|||||||||||{merchant_salt}"
+	return hashlib.sha512(seq.encode("utf-8")).hexdigest()
+
+
+def _verify_payment_with_payu(merchant_key, merchant_salt, mihpayid, is_test):
+	"""
+	Call PayU's server-side Verify Payment API.
+	Returns the transaction dict from PayU on success, or None on failure.
+	"""
+	import requests
+
+	verify_url = _PAYU_VERIFY_TEST if is_test else _PAYU_VERIFY_PROD
+
+	# PayU verify hash: sha512(key|'verify_payment'|mihpayid|SALT)
+	verify_hash_str = f"{merchant_key}|verify_payment|{mihpayid}|{merchant_salt}"
+	verify_hash = hashlib.sha512(verify_hash_str.encode("utf-8")).hexdigest()
+
+	payload = {
+		"key": merchant_key,
+		"hash": verify_hash,
+		"var1": mihpayid,
+		"command": "verify_payment",
+	}
+
+	try:
+		response = requests.post(verify_url, data=payload, timeout=15)
+		response.raise_for_status()
+		data = response.json()
+	except Exception as exc:
+		frappe.log_error(f"PayU Verify API error: {exc}", "PayU Verify")
+		return None
+
+	# PayU wraps its response in {"status": 1, "msg": {...}}
+	if not data.get("status") == 1:
+		frappe.log_error(f"PayU Verify API non-1 status: {data}", "PayU Verify")
+		return None
+
+	transaction_details = data.get("transaction_details", {})
+	# transaction_details is keyed by mihpayid
+	txn = transaction_details.get(str(mihpayid)) or {}
+
+	# Log response for debugging
+	frappe.log_error(f"PayU verify response for {mihpayid}: {txn}", "PayU Debug")
+
+	return txn
+
+
 @frappe.whitelist()
+@rate_limit(limit=10, seconds=60)
 def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -> dict:
 	"""
-	Generate all parameters required by PayU Bolt (inline checkout).
-
-	Returns a dict with ``key``, ``txnid``, ``amount``, ``productinfo``,
-	``firstname``, ``email``, ``phone``, ``surl``, ``furl``, ``hash`` and
-	``environment`` (``test`` or ``production``).
-
-	The hash is computed **server-side** using SHA-512 so the merchant salt
-	is never exposed to the browser.
+	Generate (or retrieve from cache) all parameters required by PayU Bolt.
+	KEY CHANGE: txnid is now cached per booking_id for 1 hour to prevent 429 errors.
 	"""
-	import hashlib
-
 	booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
 
-	# Permission check – only the booking owner (or a System Manager) may fetch.
-	# For guest sessions access is implicitly granted because the booking_id is
-	# only known to the browser that just created the booking.
+	# Permission check
 	is_guest_session = frappe.session.user == "Guest"
 	if not is_guest_session and (
 		booking_doc.user != frappe.session.user
@@ -1414,67 +1489,52 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 			frappe.throw(_("No payment gateway configured for this event"))
 		payment_gateway = gateways[0]
 
-	# Fetch PayU Settings doc (must be configured in Frappe)
-	try:
-		payu_settings = frappe.get_cached_doc("PayU Settings")
-	except Exception:
-		frappe.throw(
-			_(
-				"PayU Settings not found. Please configure PayU Settings in the system."
-			)
-		)
+	_, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
-	merchant_key = payu_settings.get("merchant_key") or payu_settings.get("api_key") or ""
-	merchant_salt = payu_settings.get_password("merchant_salt") or payu_settings.get_password("api_secret") or ""
-	is_test = bool(payu_settings.get("sandbox") or payu_settings.get("test_mode"))
+	# ------------------------------------------------------------------
+	# Cache key: one stable txnid per booking.
+	# ------------------------------------------------------------------
+	cache_key = f"payu_bolt_params:{booking_id}"
+	cached_params = frappe.cache.get_value(cache_key)
 
-	if not merchant_key or not merchant_salt:
-		frappe.throw(_("PayU merchant key / salt is not configured in PayU Settings"))
+	if cached_params:
+		frappe.cache.set_value(cache_key, cached_params, expires_in_sec=3600)
+		return cached_params
 
-	# Build transaction parameters
 	event_title = frappe.get_cached_value("Buzz Event", booking_doc.event, "title") or "Event"
 
-	# Use the booking's user (works for both logged-in and guest bookings)
 	booking_user_email = booking_doc.user or frappe.session.user
-	user_data = frappe.db.get_value(
-		"User",
-		booking_user_email,
-		["first_name", "last_name", "mobile_no"],
-		as_dict=True,
-	) or frappe._dict()
+	user_data = (
+		frappe.db.get_value(
+			"User",
+			booking_user_email,
+			["first_name", "last_name", "mobile_no"],
+			as_dict=True,
+		)
+		or frappe._dict()
+	)
 
-	txnid = f"BUZZ-{booking_id}-{frappe.generate_hash(length=8).upper()}"
+	# txnid is simply the booking ID (predictable and clean)
+	txnid = f"BUZZ-BK-{booking_id}"
 	amount = f"{booking_doc.total_amount:.2f}"
 	productinfo = f"Tickets: {event_title}"
-	firstname = user_data.get("first_name") or booking_user_email.split("@")[0]
+	firstname = (user_data.get("first_name") or booking_user_email.split("@")[0]).strip()
 	email = booking_user_email
-	# For guest bookings, also try to get the phone from the first attendee
+
 	attendee_phone = ""
 	if booking_doc.attendees:
 		attendee_phone = (getattr(booking_doc.attendees[0], "phone", "") or "").strip()
-	phone = (user_data.get("mobile_no") or attendee_phone or "").strip() or "0000000000"
+	phone = (user_data.get("mobile_no") or attendee_phone or "").strip() or "9999999999"
 
-	# Store txnid so we can verify later
-	frappe.cache.set_value(
-		f"payu_txnid:{txnid}",
-		{
-			"booking_id": booking_id,
-			"amount": amount,
-			"payment_gateway": payment_gateway,
-		},
-		expires_in_sec=3600,
+	generated_hash = _compute_forward_hash(
+		merchant_key, txnid, amount, productinfo, firstname, email, merchant_salt
 	)
 
-	# SHA-512 hash: key|txnid|amount|productinfo|firstname|email|udf1-5||||||SALT
-	hash_sequence = f"{merchant_key}|{txnid}|{amount}|{productinfo}|{firstname}|{email}|||||||||||{merchant_salt}"
-	generated_hash = hashlib.sha512(hash_sequence.encode("utf-8")).hexdigest()
-
-	# Determine success / failure callback URLs (Frappe endpoint)
 	base_url = frappe.utils.get_url()
 	surl = f"{base_url}/api/method/buzz.api.payu_payment_callback"
 	furl = f"{base_url}/api/method/buzz.api.payu_payment_callback"
 
-	return {
+	params = {
 		"key": merchant_key,
 		"txnid": txnid,
 		"amount": amount,
@@ -1489,36 +1549,116 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 		"booking_id": booking_id,
 	}
 
+	frappe.cache.set_value(cache_key, params, expires_in_sec=3600)
+	frappe.cache.set_value(
+		f"payu_txnid:{txnid}",
+		{
+			"booking_id": booking_id,
+			"amount": amount,
+			"payment_gateway": payment_gateway,
+		},
+		expires_in_sec=3600,
+	)
+
+	return params
+
+
+@frappe.whitelist()
+def confirm_payu_payment(txnid: str, mihpayid: str, status: str, received_hash: str) -> dict:
+	"""
+	Frontend calls this after bolt's responseHandler fires with SUCCESS.
+	We now call PayU's server-side Verify Payment API to confirm.
+	"""
+	cached = frappe.cache.get_value(f"payu_txnid:{txnid}")
+	if not cached:
+		frappe.throw(_("Transaction not found or has expired"))
+
+	booking_id = cached.get("booking_id")
+	booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
+
+	# Permission check
+	is_guest_session = frappe.session.user == "Guest"
+	if not is_guest_session and (
+		booking_doc.user != frappe.session.user
+		and not frappe.has_permission("Event Booking", "read", booking_doc)
+	):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	_, merchant_key, merchant_salt, is_test = _get_payu_settings()
+
+	status_lower = (status or "").lower()
+
+	if status_lower != "success":
+		frappe.cache.delete_value(f"payu_txnid:{txnid}")
+		return {"success": False, "booking_id": booking_id, "status": status_lower}
+
+	if not mihpayid:
+		frappe.throw(_("Payment ID (mihpayid) is missing"))
+
+	# Server-side verification
+	txn = _verify_payment_with_payu(merchant_key, merchant_salt, mihpayid, is_test)
+
+	if txn is None:
+		frappe.throw(
+			_("Could not verify payment with PayU. Please contact support with your booking ID: {0}").format(
+				booking_id
+			)
+		)
+
+	payu_status = (txn.get("status") or "").lower()
+
+	if payu_status not in ("captured", "success"):
+		frappe.log_error(
+			f"PayU verification returned status '{payu_status}' for txnid {txnid}", "PayU Confirm"
+		)
+		frappe.cache.delete_value(f"payu_txnid:{txnid}")
+		return {
+			"success": False,
+			"booking_id": booking_id,
+			"status": payu_status,
+		}
+
+	# Extra Security: Validate amount against PayU's response
+	payu_amount = float(txn.get("amount") or 0)
+	expected_amount = float(cached.get("amount") or 0)
+	if abs(payu_amount - expected_amount) > 0.01:
+		frappe.log_error(f"PayU amount mismatch: expected {expected_amount}, got {payu_amount}", "PayU Confirm")
+		frappe.cache.delete_value(f"payu_txnid:{txnid}")
+		frappe.throw(_("Payment amount mismatch. Please contact support."))
+
+	# Verify the txnid returned by PayU matches
+	if txn.get("txnid") and txn.get("txnid") != txnid:
+		frappe.log_error(f"PayU txnid mismatch: expected {txnid}, got {txn.get('txnid')}", "PayU Confirm")
+		frappe.cache.delete_value(f"payu_txnid:{txnid}")
+		frappe.throw(_("Payment verification failed. Please contact support."))
+
+	_mark_booking_paid(booking_id, txnid, mihpayid)
+
+	# Clear cache entries on success
+	frappe.cache.delete_value(f"payu_txnid:{txnid}")
+	frappe.cache.delete_value(f"payu_bolt_params:{booking_id}")
+
+	return {"success": True, "booking_id": booking_id}
+
 
 @frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
 def payu_payment_callback(**kwargs):
-	"""
-	Server-side callback invoked by PayU after a transaction attempt.
-	PayU sends POST data to surl/furl. We verify the reverse hash and
-	mark the booking paid if successful.
-
-	This endpoint is intentionally *stateless* – the frontend ``confirm_payu_payment``
-	does the authoritative check; this is a secondary server-to-server hook.
-	"""
-	import hashlib
-
+	"""Server-to-server callback invoked by PayU."""
 	data = frappe.local.form_dict
 	txnid = data.get("txnid", "")
 	status = data.get("status", "").lower()
 	received_hash = data.get("hash", "")
 
-	# Look up cached transaction data
 	cached = frappe.cache.get_value(f"payu_txnid:{txnid}")
 	if not cached:
-		return  # stale or forged request – silently drop
+		return
 
 	try:
-		payu_settings = frappe.get_cached_doc("PayU Settings")
-		merchant_salt = payu_settings.get_password("merchant_salt") or payu_settings.get_password("api_secret") or ""
+		_, merchant_key, merchant_salt, _ = _get_payu_settings()
 	except Exception:
 		return
 
-	# Reverse hash for verification
+	# Reverse hash verification
 	additional_charges = data.get("additionalCharges", "")
 	udf5 = data.get("udf5", "")
 	udf4 = data.get("udf4", "")
@@ -1527,14 +1667,20 @@ def payu_payment_callback(**kwargs):
 	udf1 = data.get("udf1", "")
 	email_v = data.get("email", "")
 	firstname_v = data.get("firstname", "")
-	productinfo_v = data.get("productinfo", "")
+	prodinfo_v = data.get("productinfo", "")
 	amount_v = data.get("amount", "")
 	key_v = data.get("key", "")
 
 	if additional_charges:
-		reverse_str = f"{additional_charges}|{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email_v}|{firstname_v}|{productinfo_v}|{amount_v}|{txnid}|{key_v}"
+		reverse_str = (
+			f"{additional_charges}|{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}"
+			f"|{email_v}|{firstname_v}|{prodinfo_v}|{amount_v}|{txnid}|{key_v}"
+		)
 	else:
-		reverse_str = f"{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email_v}|{firstname_v}|{productinfo_v}|{amount_v}|{txnid}|{key_v}"
+		reverse_str = (
+			f"{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}"
+			f"|{email_v}|{firstname_v}|{prodinfo_v}|{amount_v}|{txnid}|{key_v}"
+		)
 
 	expected_hash = hashlib.sha512(reverse_str.encode("utf-8")).hexdigest()
 
@@ -1545,79 +1691,34 @@ def payu_payment_callback(**kwargs):
 	if status == "success":
 		booking_id = cached.get("booking_id")
 		_mark_booking_paid(booking_id, txnid, data.get("mihpayid", ""))
-
-
-@frappe.whitelist()
-def confirm_payu_payment(txnid: str, mihpayid: str, status: str, received_hash: str) -> dict:
-	"""
-	Frontend calls this after ``bolt``'s ``responseHandler`` fires.
-
-	We re-verify the reverse hash server-side (the browser cannot forge this
-	because the salt lives only on the server) and mark the booking paid.
-	"""
-	import hashlib
-
-	cached = frappe.cache.get_value(f"payu_txnid:{txnid}")
-	if not cached:
-		frappe.throw(_("Transaction not found or has expired"))
-
-	# Verify the caller owns this booking.
-	# Guest sessions are allowed because they hold the txnid issued to them.
-	booking_id = cached.get("booking_id")
-	booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
-	is_guest_session = frappe.session.user == "Guest"
-	if not is_guest_session and (
-		booking_doc.user != frappe.session.user
-		and not frappe.has_permission("Event Booking", "read", booking_doc)
-	):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-
-	try:
-		payu_settings = frappe.get_cached_doc("PayU Settings")
-		merchant_key = payu_settings.get("merchant_key") or payu_settings.get("api_key") or ""
-		merchant_salt = payu_settings.get_password("merchant_salt") or payu_settings.get_password("api_secret") or ""
-	except Exception:
-		frappe.throw(_("PayU Settings not configured"))
-
-	status_lower = (status or "").lower()
-
-	# Simple reverse-hash verification using known fields
-	# Full verification would need all udf fields; we use what we stored.
-	amount_v = cached.get("amount", "")
-	# Since we don't have all POST fields here, we trust the mihpayid + status
-	# and do a minimal check. For production you should call PayU Verify API.
-	if status_lower == "success" and mihpayid:
-		_mark_booking_paid(booking_id, txnid, mihpayid)
 		frappe.cache.delete_value(f"payu_txnid:{txnid}")
-		return {"success": True, "booking_id": booking_id}
-
-	frappe.cache.delete_value(f"payu_txnid:{txnid}")
-	return {"success": False, "booking_id": booking_id, "status": status}
+		frappe.cache.delete_value(f"payu_bolt_params:{booking_id}")
 
 
 def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
-	"""Submit the booking and record payment."""
+	"""Submit the booking and record payment. Idempotent."""
 	booking_doc = frappe.get_doc("Event Booking", booking_id)
 
 	if booking_doc.docstatus == 1:
 		return  # Already submitted
 
-	# Record payment
-	payment_doc = frappe.db.get_value(
+	payment_doc_name = frappe.db.get_value(
 		"Event Payment",
 		{"reference_docname": booking_id, "reference_doctype": "Event Booking"},
 		"name",
 	)
-	if payment_doc:
+	if payment_doc_name:
 		frappe.db.set_value(
 			"Event Payment",
-			payment_doc,
+			payment_doc_name,
 			{
 				"payment_received": 1,
 				"payment_id": mihpayid,
 				"order_id": txnid,
 			},
 		)
+	else:
+		frappe.log_error(f"No Event Payment found for {booking_id}", "PayU Warning")
 
 	booking_doc.flags.ignore_permissions = True
 	booking_doc.submit()
