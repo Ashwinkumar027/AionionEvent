@@ -462,6 +462,7 @@ def process_booking(
 			"first_name": first_name,
 			"last_name": last_name,
 			"email": attendee.get("email"),
+			"phone": attendee.get("phone"),
 			"ticket_type": attendee.get("ticket_type"),
 			"add_ons": add_ons.name if add_ons else None,
 			"custom_fields": custom_fields if custom_fields else None,
@@ -1377,10 +1378,6 @@ def register_campaign_interest(campaign: str):
 
 
 # ---------------------------------------------------------------------------
-# PayU Bolt (inline checkout) – hash generation
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # PayU Bolt (inline checkout) – stable hash generation & server-side verify
 # ---------------------------------------------------------------------------
 
@@ -1489,7 +1486,7 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 			frappe.throw(_("No payment gateway configured for this event"))
 		payment_gateway = gateways[0]
 
-	_, merchant_key, merchant_salt, is_test = _get_payu_settings()
+	__, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
 	# ------------------------------------------------------------------
 	# Cache key: one stable txnid per booking.

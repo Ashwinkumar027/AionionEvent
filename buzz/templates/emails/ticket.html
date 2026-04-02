@@ -1,350 +1,225 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html dir="ltr" lang="en">
   <head>
-    <link
-      rel="preload"
-      as="image"
-      href="{{ event_doc.banner_image }}" />
     <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
-    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style type="text/css">
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f3f4f6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+      .header {
+        background-color: #111827;
+        padding: 24px 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .logo-text {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      .logo-accent {
+        color: #f97316;
+      }
+      .e-ticket-label {
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 400;
+      }
+      .content-section {
+        padding: 32px 40px;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .event-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 12px 0;
+      }
+      .event-meta {
+        font-size: 16px;
+        color: #4b5563;
+        margin: 4px 0;
+      }
+      .info-grid {
+        display: table;
+        width: 100%;
+        margin-top: 24px;
+      }
+      .info-col {
+        display: table-cell;
+        width: 60%;
+        vertical-align: top;
+      }
+      .qr-col {
+        display: table-cell;
+        width: 40%;
+        vertical-align: top;
+        text-align: right;
+      }
+      .label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+      }
+      .value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 20px;
+      }
+      .qr-card {
+        background-color: #f9fafb;
+        padding: 12px;
+        border-radius: 8px;
+        display: inline-block;
+        border: 1px solid #e5e7eb;
+      }
+      .booking-id-text {
+        font-size: 14px;
+        color: #4b5563;
+        margin-top: 8px;
+        font-weight: 500;
+      }
+      .divider {
+        border: 0;
+        border-top: 1px dashed #d1d5db;
+        margin: 32px 0;
+      }
+      .important-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 12px;
+      }
+      .important-item {
+        font-size: 14px;
+        color: #4b5563;
+        margin: 8px 0;
+        line-height: 1.5;
+      }
+      .footer-card {
+        background-color: #eff6ff;
+        padding: 20px 40px;
+        border-radius: 0 0 12px 12px;
+      }
+      .footer-text {
+        font-size: 14px;
+        color: #1e40af;
+        margin: 0;
+      }
+      .footer-link {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .meta-footer {
+        text-align: center;
+        padding: 24px;
+        color: #9ca3af;
+        font-size: 12px;
+      }
+    </style>
   </head>
-  <body
-    style='background-color:rgb(243,244,246);font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";padding-top:40px;padding-bottom:40px'>
-    <!--$-->
-    <div
-      style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0"
-      data-skip-in-text="true">
-      Your ticket for {{ event_title }} is ready!
-
-    </div>
-    <table
-      align="center"
-      width="100%"
-      border="0"
-      cellpadding="0"
-      cellspacing="0"
-      role="presentation"
-      style="background-color:rgb(255,255,255);border-radius:8px;box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 0 #0000;max-width:600px;margin-left:auto;margin-right:auto;overflow:hidden">
-      <tbody>
-        <tr style="width:100%">
-          <td>
-            <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="background-color:rgb(31,41,55);padding-left:40px;padding-right:40px;padding-top:32px;padding-bottom:32px;text-align:center">
-              <tbody>
-                <tr>
-                  <td>
-                    <h1
-                      style="color:rgb(255,255,255);font-size:28px;font-weight:700;margin:0px;margin-bottom:8px">
-                      🎟️ Your Ticket is Ready!
-                    </h1>
-                    <p
-                      style="color:rgb(219,234,254);font-size:16px;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                      Get ready for an amazing experience
-                    </p>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="padding-left:40px;padding-right:40px;padding-top:32px;padding-bottom:32px">
-              <tbody>
-                <tr>
-                  <td>
-                    <table
-                      align="center"
-                      width="100%"
-                      border="0"
-                      cellpadding="0"
-                      cellspacing="0"
-                      role="presentation">
-                      <tbody style="width:100%">
-                        <tr style="width:100%">
-                          <td data-id="__react-email-column">
-                            <h1
-                              style="color:rgb(31,41,55);font-size:24px;font-weight:700;margin-bottom:16px;margin-top:0px">
-                              {{ event_title }}
-                            </h1>
-                            <table
-                              align="center"
-                              width="100%"
-                              border="0"
-                              cellpadding="0"
-                              cellspacing="0"
-                              role="presentation"
-                              style="margin-bottom:24px">
-                              <tbody style="width:100%">
-                                <tr style="width:100%">
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-right:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      📅 DATE &amp; TIME
-                                    </p>
-                                    <p
-                                      style="color:rgb(31,41,55);font-size:16px;font-weight:500;margin:0px;margin-bottom:16px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                                      {{ frappe.format_date(event_doc.start_date) }}
-
-									  {% if event_doc.start_date != event_doc.end_date %}
-									  <span>
-									  - {{ frappe.format_date(event_doc.end_date) }}
-										</span>
-									  {% endif %}
-                                    </p>
-                                    <p
-                                      style="color:rgb(31,41,55);font-size:16px;font-weight:500;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                                      {{ frappe.utils.format_time(event_doc.start_time, "hh:mm a") }}
-									  {% if event_doc.end_time %}
-									  - {{ frappe.utils.format_time(event_doc.end_time, "hh:mm a") }}
-									  {% endif %}
-
-									  {{ event_doc.time_zone or "" }}
-                                    </p>
-                                  </td>
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-left:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      📍 VENUE
-                                    </p>
-                                    <p
-                                      style="color:rgb(31,41,55);font-size:16px;font-weight:500;margin:0px;margin-bottom:8px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                                      {{ event_doc.venue }}
-                                    </p>
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                                      {{ frappe.db.get_value("Event Venue", event_doc.venue, "address") }}
-                                    </p>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <hr
-                              style="border-color:rgb(229,231,235);border-style:solid;margin-top:24px;margin-bottom:24px;width:100%;border:none;border-top:1px solid #eaeaea" />
-                            <table
-                              align="center"
-                              width="100%"
-                              border="0"
-                              cellpadding="0"
-                              cellspacing="0"
-                              role="presentation"
-                              style="margin-bottom:24px">
-                              <tbody style="width:100%">
-                                <tr style="width:100%">
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-right:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      👤 ATTENDEE
-                                    </p>
-                                    <p
-                                      style="color:rgb(31,41,55);font-size:18px;font-weight:600;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                                      {{ doc.attendee_name }}
-                                    </p>
-                                  </td>
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-left:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      🎫 TICKET TYPE
-                                    </p>
-                                    <p
-                                      style="color:rgb(31,41,55);font-size:16px;font-weight:500;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                                      {{ frappe.db.get_value("Event Ticket Type", doc.ticket_type, "title") }}
-                                    </p>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <table
-                              align="center"
-                              width="100%"
-                              border="0"
-                              cellpadding="0"
-                              cellspacing="0"
-                              role="presentation"
-                              style="margin-bottom:32px">
-                              <tbody style="width:100%">
-                                <tr style="width:100%">
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-right:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      🔢 TICKET ID
-                                    </p>
-                                    <p
-                                      style='color:rgb(31,41,55);font-size:16px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-weight:500;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px'>
-                                      {{ doc.name }}
-                                    </p>
-                                  </td>
-                                  {% if doc.add_ons %}
-                                  <td
-                                    data-id="__react-email-column"
-                                    style="width:50%;padding-left:16px">
-                                    <p
-                                      style="color:rgb(75,85,99);font-size:14px;font-weight:600;margin-bottom:4px;margin-top:0px;line-height:24px">
-                                      ✨ ADD-ONS
-                                    </p>
-                                    <div>
-										{% for add_on in doc.add_ons %}
-                                      <p
-                                        style="color:rgb(31,41,55);font-size:14px;margin:0px;margin-bottom:2px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                                        •
-                                         {{ frappe.db.get_value("Ticket Add-on", add_on.add_on, "title") }} ({{ add_on.value }})
-                                      </p>
-									  {% endfor %}
-                                    </div>
-                                  </td>
-                                  {% endif %}
-                                </tr>
-                              </tbody>
-                            </table>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="background-color:rgb(249,250,251);padding-left:40px;padding-right:40px;padding-top:32px;padding-bottom:32px;text-align:center;border-top-width:2px;border-style:dashed;border-color:rgb(209,213,219)">
-              <tbody>
-                <tr>
-                  <td>
-                    <p
-                      style="color:rgb(31,41,55);font-size:18px;font-weight:600;margin-bottom:16px;margin-top:0px;line-height:24px">
-                      Your Entry QR Code
-                    </p>
-                    <div
-                      style="background-color:rgb(255,255,255);padding:16px;border-radius:8px;display:inline-block;border-style:solid;border-width:2px;border-color:rgb(229,231,235)">
-                      <img
-                        alt="Event Entry QR Code"
-                        height="200"
-                        src="{{ doc.qr_code }}"
-                        style="width:100%;height:auto;object-fit:cover;display:block;outline:none;border:none;text-decoration:none"
-                        width="200" />
-                    </div>
-                    <p
-                      style="color:rgb(75,85,99);font-size:14px;margin-top:16px;margin-bottom:0px;line-height:24px">
-                      Show this QR code at the venue entrance for quick check-in
-                    </p>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <!-- <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="padding-left:40px;padding-right:40px;padding-top:24px;padding-bottom:24px;background-color:rgb(254,252,232);border-left-width:4px;border-style:solid;border-color:rgb(250,204,21)">
-              <tbody>
-                <tr>
-                  <td>
-                    <p
-                      style="color:rgb(133,77,14);font-size:16px;font-weight:600;margin-bottom:8px;margin-top:0px;line-height:24px">
-                      ⚠️ Important Information
-                    </p>
-                    <p
-                      style="color:rgb(161,98,7);font-size:14px;margin:0px;margin-bottom:8px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                      • Please arrive 30 minutes before the event starts
-                    </p>
-                    <p
-                      style="color:rgb(161,98,7);font-size:14px;margin:0px;margin-bottom:8px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                      • Bring a valid ID for verification
-                    </p>
-                    <p
-                      style="color:rgb(161,98,7);font-size:14px;margin:0px;margin-bottom:8px;line-height:24px;margin-top:0px;margin-left:0px;margin-right:0px">
-                      • This ticket is non-transferable and non-refundable
-                    </p>
-                    <p
-                      style="color:rgb(161,98,7);font-size:14px;margin:0px;line-height:24px;margin-top:0px;margin-bottom:0px;margin-left:0px;margin-right:0px">
-                      • Save this email or take a screenshot for backup
-                    </p>
-                  </td>
-                </tr>
-              </tbody>
-            </table> -->
-			{% set event_settings = frappe.get_cached_doc("Buzz Settings") %}
-			{% if event_settings.support_email %}
-            <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="padding-left:40px;padding-right:40px;padding-top:24px;padding-bottom:24px;text-align:center">
-              <tbody>
-                <tr>
-                  <td>
-                    <p
-                      style="color:rgb(75,85,99);font-size:14px;margin-bottom:16px;margin-top:0px;line-height:24px">
-                      Need help? Contact our support team
-                    </p>
-                    <a
-                      href="mailto:{{ event_settings.support_email }}"
-                      style="background-color:rgb(37,99,235);color:rgb(255,255,255);padding-left:24px;padding-right:24px;padding-top:12px;padding-bottom:12px;border-radius:6px;font-size:16px;font-weight:600;text-decoration-line:none;box-sizing:border-box"
-                      target="_blank"
-                      >Contact Support</a
-                    >
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-			{% endif %}
-            <table
-              align="center"
-              width="100%"
-              border="0"
-              cellpadding="0"
-              cellspacing="0"
-              role="presentation"
-              style="background-color:rgb(31,41,55);padding-left:40px;padding-right:40px;padding-top:24px;padding-bottom:24px;text-align:center">
-              <tbody>
-                <tr>
-                  <td>
-                    <p
-                      style="color:rgb(209,213,219);font-size:14px;margin-bottom:8px;margin-top:0px;line-height:24px">
-                      Powered by <a href="https://github.com/BuildWithHussain/buzz">Buzz</a>. Built on <a href="https://frappe.io/framework">Frappe Framework</a>.
-                    </p>
-                    <p
-                      style="color:rgb(156,163,175);font-size:12px;margin-top:16px;margin-bottom:0px;line-height:24px">
-                      © 2025
-                    </p>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #111827; padding: 24px 40px;">
+        <tr>
+          <td align="left" class="logo-text">
+            ticket<span class="logo-accent">9</span>
+          </td>
+          <td align="right" class="e-ticket-label">
+            e-Ticket
           </td>
         </tr>
-      </tbody>
-    </table>
-    <!--7--><!--/$-->
+      </table>
+
+      <!-- Event Details Card -->
+      <div class="content-section">
+        <h1 class="event-title">{{ event_title }}</h1>
+        <p class="event-meta">
+          {{ frappe.format_date(event_doc.start_date) }}, {{ frappe.utils.format_time(event_doc.start_time, "hh:mm a") }} onwards
+        </p>
+        <p class="event-meta">{{ event_doc.venue }}</p>
+        {% if doc.creation %}
+        <p class="event-meta" style="font-size: 13px; color: #9ca3af; margin-top: 12px;">
+          Purchased on {{ frappe.format_date(doc.creation) }}, {{ frappe.utils.format_time(doc.creation, "hh:mm a") }}
+        </p>
+        {% endif %}
+      </div>
+
+      <!-- Ticket & QR Section -->
+      <div class="content-section">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td width="60%" valign="top">
+              <div class="label">Ticket Holder</div>
+              <div class="value">{{ doc.attendee_name }}<br><span style="font-weight: 400; color: #6b7280;">{{ doc.attendee_email }}</span></div>
+
+              <div class="label">Ticket</div>
+              <div class="value">1 x Ticket(s) 🎫</div>
+
+              <div class="label">Ticket Category</div>
+              <div class="value">{{ frappe.db.get_value("Event Ticket Type", doc.ticket_type, "title") }}</div>
+              
+              {% if doc.add_ons %}
+              <div class="label">Add-ons</div>
+              <div class="value">
+                {% for add_on in doc.add_ons %}
+                  • {{ frappe.db.get_value("Ticket Add-on", add_on.add_on, "title") }} ({{ add_on.value }}){% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            <td width="40%" valign="top" align="right">
+              <div class="qr-card">
+                <img src="{{ doc.qr_code }}" width="140" height="140" style="display: block; border-radius: 4px;" alt="QR Code" />
+              </div>
+              <div class="booking-id-text">Booking ID: <span style="color: #111827;">{{ doc.booking or doc.name }}</span></div>
+            </td>
+          </tr>
+        </table>
+
+        <hr class="divider" />
+
+        <div class="important-title">Important Information</div>
+        <div class="important-item">• Scan & Go! Keep your QR code ready for a smooth entry.</div>
+        <div class="important-item">• Your Ticket, Your Access! This ticket is strictly non-transferable.</div>
+        <div class="important-item">• Ticket promotes safe, inclusive, and responsible event experiences.</div>
+        <div class="important-item">• Follow event guidelines and help create a safe & enjoyable space for all.</div>
+      </div>
+
+      <!-- Support Footer -->
+      {% set event_settings = frappe.get_cached_doc("Buzz Settings") %}
+      <div class="footer-card">
+        <p class="footer-text">Need Help?</p>
+        <p class="footer-text" style="font-size: 13px; color: #4b5563; margin-top: 4px;">
+          For any Payment-related issues, You can contact us at 
+          <a href="mailto:{{ event_settings.support_email or 'support@theticket.com' }}" class="footer-link">{{ event_settings.support_email or 'support@theticket.com' }}</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="meta-footer">
+      Powered by Buzz <br>
+      © {{ frappe.utils.now_datetime().year }}
+    </div>
   </body>
 </html>

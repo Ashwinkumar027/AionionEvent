@@ -1345,7 +1345,12 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 						paymentGateway.toLowerCase()
 					);
 
-				if (isPayUGateway && !data.payment_link && data.booking_name) {
+				if (
+					finalTotal.value > 0 &&
+					isPayUGateway &&
+					!data.payment_link &&
+					data.booking_name
+				) {
 					pendingPayUBookingId.value = data.booking_name;
 					pendingPayUGateway.value = paymentGateway || null;
 					showPayUBolt.value = true;
