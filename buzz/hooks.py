@@ -8,7 +8,7 @@ app_license = "agpl-3.0"
 # Apps
 # ------------------
 
-required_apps = ["frappe/payments"]
+required_apps = ["Ashwinkumar027/payments"]
 
 export_python_type_annotations = True
 
