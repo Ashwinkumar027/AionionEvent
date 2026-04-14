@@ -60,5 +60,5 @@ indent-style = "tab"
 # docstring-code-format = true
 
 [tool.bench.frappe-dependencies]
-paymemts = "*"
+payments = "*"
 frappe = ">=16.0.0-dev,<18.0.0
