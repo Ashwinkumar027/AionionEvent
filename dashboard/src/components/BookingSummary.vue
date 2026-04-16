@@ -159,7 +159,15 @@
 		<template v-else>
 			<hr class="my-2 border-t border-outline-gray-1" />
 			<div class="text-center pt-2">
-				<div class="text-xl font-bold text-green-600">{{ __("Free Event") }}</div>
+				<div
+					v-if="Number(total) > 0"
+					class="text-xl font-bold text-ink-gray-9"
+				>
+					{{ formatPriceOrFree(total, totalCurrency) }}
+				</div>
+				<div v-else class="text-xl font-bold text-green-600">
+					{{ __("Free Event") }}
+				</div>
 			</div>
 		</template>
 	</div>

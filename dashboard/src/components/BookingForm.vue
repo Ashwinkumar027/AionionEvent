@@ -5,9 +5,10 @@
 
 		<!-- PayU Bolt inline checkout (no page redirect) -->
 		<PayUBoltDialog
-			v-if="showPayUBolt"
+			v-if="showPayUBolt && isPaid && finalTotal > 0"
 			:booking-id="pendingPayUBookingId"
 			:payment-gateway="pendingPayUGateway"
+			:is-paid="isPaid"
 			@payment-success="onPayUSuccess"
 			@payment-failure="onPayUFailure"
 			@close="showPayUBolt = false"
@@ -381,29 +382,43 @@
 							</div>
 						</div>
 
-						<BookingSummary
-							class="mb-6"
-							v-if="!eventDetails.free_webinar"
-							:summary="summary"
-							:net-amount="netAmount"
-							:discount-amount="discountAmount"
-							:coupon-applied="couponApplied"
-							:coupon-type="couponData?.coupon_type || ''"
-							:free-add-on-counts="freeAddOnCounts"
-							:free-ticket-type="
-								couponData?.coupon_type === 'Free Tickets'
-									? couponData?.ticket_type
-									: ''
-							"
-							:free-ticket-count="couponData?.remaining_tickets || 0"
-							:tax-amount="taxAmount"
-							:tax-percentage="taxPercentage"
-							:tax-label="taxLabel"
-							:tax-inclusive="taxInclusive"
-							:should-apply-tax="shouldApplyTax"
-							:total="finalTotal"
-							:total-currency="totalCurrency"
-						/>
+						<div class="relative">
+							<!-- Full-screen overlay during initial processing ONLY -->
+							<div
+								v-if="processBooking.loading && !showPayUBolt"
+								class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+							>
+								<div class="flex flex-col items-center gap-3 text-white">
+									<div class="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+									<span class="text-base font-medium">{{ __("Initializing Payment...") }}</span>
+								</div>
+							</div>
+
+							<BookingSummary
+								v-if="!eventDetails.free_webinar && !showPayUBolt && Number.isFinite(finalTotal)"
+								class="mb-6"
+								:summary="summary"
+								:net-amount="netAmount"
+								:discount-amount="discountAmount"
+								:coupon-applied="couponApplied"
+								:coupon-type="couponData?.coupon_type || ''"
+								:free-add-on-counts="freeAddOnCounts"
+								:free-ticket-type="
+									couponData?.coupon_type === 'Free Tickets'
+										? couponData?.ticket_type
+										: ''
+								"
+								:free-ticket-count="couponData?.remaining_tickets || 0"
+								:tax-amount="taxAmount"
+								:tax-percentage="taxPercentage"
+								:tax-label="taxLabel"
+								:tax-inclusive="taxInclusive"
+								:should-apply-tax="shouldApplyTax"
+								:key="finalTotal"
+								:total="finalTotal > 0 ? finalTotal : 0"
+								:total-currency="totalCurrency"
+							/>
+						</div>
 
 						<div class="w-full">
 							<Button
@@ -412,6 +427,7 @@
 								class="w-full"
 								type="submit"
 								:loading="processBooking.loading || sendOtpResource.loading"
+								:disabled="showPayUBolt"
 							>
 								{{ submitButtonText }}
 							</Button>
@@ -542,6 +558,8 @@ const selectedGateway = ref(null);
 const showPayUBolt = ref(false);
 const pendingPayUBookingId = ref(null);
 const pendingPayUGateway = ref(null);
+
+const isPaid = computed(() => Number(finalTotal.value || 0) > 0);
 
 const isOfflineGateway = (gateway) => props.offlineMethods.some((m) => m.title === gateway);
 
@@ -876,11 +894,17 @@ const taxAmount = computed(() => {
 });
 
 const finalTotal = computed(() => {
-	if (taxInclusive.value) {
-		// Price already includes tax — total stays the same
-		return amountAfterDiscount.value;
+	const base = Number(amountAfterDiscount.value || 0);
+	const tax = Number(taxAmount.value || 0);
+
+	let value = taxInclusive.value ? base : base + tax;
+
+	// Prevent invalid or unstable values during reactivity updates
+	if (!Number.isFinite(value) || value < 0) {
+		return base > 0 ? base : 0;
 	}
-	return amountAfterDiscount.value + taxAmount.value;
+
+	return Number(value.toFixed(2));
 });
 
 // Determine the primary currency for the total (use the first ticket type's currency)
@@ -1381,7 +1405,10 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 				}
 
 				// Guest booking success
-				if (props.isGuestMode) {
+				if (props.isGuestMode && !isPaid.value) {
+					router.replace(`/account/bookings/${data.booking_name}`);
+				}
+				else if (props.isGuestMode) {
 					bookingSuccess.value = true;
 					successBookingName.value = data.booking_name;
 				}
@@ -1393,7 +1420,7 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 
 				// Free event
 				else {
-					router.replace(`/bookings/${data.booking_name}?success=true`);
+					router.replace(`/account/bookings/${data.booking_name}`);
 				}
 			},
 
@@ -1529,6 +1556,14 @@ function onPayUSuccess({ bookingId }) {
 
 function onPayUFailure({ message }) {
 	showPayUBolt.value = false;
+	pendingPayUBookingId.value = null;
+	pendingPayUGateway.value = null;
+
+	// Note: We intentionally keep the coupon state intact so the user can try again easily.
+
+	// Force reactivity refresh to ensure summary remains consistent
+	attendees.value = [...attendees.value];
+
 	toast.error(message || __("Payment failed. Please try again."));
 }
 </script>

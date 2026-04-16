@@ -33,7 +33,7 @@
     <!-- Full-screen backdrop loader -->
     <div
       v-if="state === 'loading'"
-      class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/70 backdrop-blur-md"
     >
       <div class="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5 max-w-sm w-full mx-4">
         <div class="relative w-14 h-14">
@@ -57,7 +57,7 @@
     <!-- Error state -->
     <div
       v-else-if="state === 'error'"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md"
     >
       <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
         <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
@@ -78,7 +78,7 @@
     <!-- Confirming state -->
     <div
       v-else-if="state === 'confirming'"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md"
     >
       <div class="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5 max-w-sm w-full mx-4">
         <div class="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center animate-pulse">
@@ -95,7 +95,7 @@
     <!-- Success state -->
     <div
       v-else-if="state === 'success'"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md"
     >
       <div class="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-4 max-w-sm w-full mx-4 text-center">
         <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center animate-bounce">
@@ -121,6 +121,7 @@ import { useRouter } from "vue-router";
 const props = defineProps({
   bookingId: { type: String, required: true },
   paymentGateway: { type: String, default: null },
+  isPaid: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["payment-success", "payment-failure", "close"]);
@@ -309,6 +310,12 @@ const confirmPayment = createResource({ url: "buzz.api.confirm_payu_payment" });
 // Core payment flow
 // ============================================================
 async function initPayment() {
+  // Defensive check: do nothing for free bookings
+  if (props.isPaid === false) {
+    console.warn("[PayUBoltDialog] initPayment called for a free booking. Ignoring.");
+    return;
+  }
+
   state.value = "loading";
   errorMessage.value = "";
 
@@ -374,8 +381,8 @@ async function initPayment() {
 
   // --- STEP 4: Small throttle delay before launch ---
   // Lowers 429 probability when the user retries quickly.
-  // This is NOT the timing fix - the interceptor is already active above.
-  await new Promise((r) => setTimeout(r, 800));
+  // Using randomized jitter as requested for production stability.
+  await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
 
   // Bail if state changed during the delay (user cancelled, etc.)
   if (state.value !== "loading") return;
@@ -475,6 +482,16 @@ function handleClose() {
 // Lifecycle
 // ============================================================
 onMounted(() => {
+  if (!props.isPaid) {
+    console.warn("[PayUBoltDialog] Skipping PayU for free booking");
+    return;
+  }
+
+  if (!props.bookingId) {
+    console.warn("[PayUBoltDialog] Missing bookingId, skipping PayU");
+    return;
+  }
+
   initPayment();
 });
 

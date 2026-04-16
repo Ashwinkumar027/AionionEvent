@@ -208,8 +208,44 @@ def can_request_cancellation(event_id: str | int) -> dict:
 	return {"can_request_cancellation": is_cancellation_request_allowed(event_id), "event_id": event_id}
 
 
+
+@frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
+def get_published_events() -> list[dict]:
+	"""Return all published events for the public events listing page."""
+	events = frappe.db.get_all(
+		"Buzz Event",
+		filters={"is_published": 1},
+		fields=[
+			"name",
+			"title",
+			"start_date",
+			"end_date",
+			"start_time",
+			"end_time",
+			"medium",
+			"venue",
+			"short_description",
+			"banner_image",
+			"card_image",
+			"route",
+			"category",
+		],
+		order_by="start_date asc",
+	)
+
+	for event in events:
+		if event.venue:
+			event.venue_title = frappe.get_cached_value("Event Venue", event.venue, "title") or event.venue
+		else:
+			event.venue_title = "Online" if event.medium == "Online" else "TBA"
+		event.display_image = event.card_image or event.banner_image
+
+	return events
+
+
 @frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
 def get_event_booking_data(event_route: str) -> dict:
+
 	data = frappe._dict()
 	event_doc = frappe.get_cached_doc("Buzz Event", {"route": event_route})
 
@@ -474,6 +510,7 @@ def process_booking(
 	frappe.db.commit()
 
 	if booking.total_amount == 0:
+		frappe.logger().info(f"Free booking detected for {booking.name}. Submitting directly.")
 		booking.flags.ignore_permissions = True
 		booking.submit()
 		return {"booking_name": booking.name}
@@ -1382,28 +1419,37 @@ def register_campaign_interest(campaign: str):
 # ---------------------------------------------------------------------------
 
 _PAYU_VERIFY_TEST = "https://sandboxsecure.payu.in/merchant/postservice?form=2"
-_PAYU_VERIFY_PROD = "https://secure.payu.in/merchant/postservice?form=2"
+_PAYU_VERIFY_PROD = "https://info.payu.in/merchant/postservice?form=2"
 
 
 def _get_payu_settings():
 	"""Return (payu_settings_doc, merchant_key, merchant_salt, is_test)."""
 	try:
-		payu_settings = frappe.get_cached_doc("PayU Settings")
+		# Always get the Single document for PayU Settings (standard for settings doctypes)
+		payu_settings = frappe.get_doc("PayU Settings")
 	except Exception:
 		frappe.throw(
 			_("PayU Settings not found. Please configure PayU Settings in the system.")
 		)
 
 	merchant_key = (payu_settings.get("merchant_key") or payu_settings.get("api_key") or "").strip()
+	
 	merchant_salt = (
-		payu_settings.get_password("merchant_salt")
-		or payu_settings.get_password("api_secret")
+		payu_settings.get_password("merchant_salt", raise_exception=False)
+		or payu_settings.get_password("api_secret", raise_exception=False)
 		or ""
 	).strip()
+
+	if not merchant_salt:
+		frappe.throw(
+			_("PayU merchant salt is not configured or not accessible in PayU Settings. "
+			  "Please go to PayU Settings and re-save the salt.")
+		)
+
 	is_test = bool(payu_settings.get("sandbox") or payu_settings.get("test_mode"))
 
-	if not merchant_key or not merchant_salt:
-		frappe.throw(_("PayU merchant key / salt is not configured in PayU Settings"))
+	if not merchant_key:
+		frappe.throw(_("PayU merchant key is not configured in PayU Settings"))
 
 	return payu_settings, merchant_key, merchant_salt, is_test
 
@@ -1436,25 +1482,31 @@ def _verify_payment_with_payu(merchant_key, merchant_salt, mihpayid, is_test):
 		"command": "verify_payment",
 	}
 
-	try:
-		response = requests.post(verify_url, data=payload, timeout=15)
-		response.raise_for_status()
-		data = response.json()
-	except Exception as exc:
-		frappe.log_error(f"PayU Verify API error: {exc}", "PayU Verify")
-		return None
-
 	# PayU wraps its response in {"status": 1, "msg": {...}}
-	if not data.get("status") == 1:
-		frappe.log_error(f"PayU Verify API non-1 status: {data}", "PayU Verify")
+	import time
+	data = {}
+	for i in range(3):
+		try:
+			response = requests.post(verify_url, data=payload, timeout=12)
+			response.raise_for_status()
+			data = response.json()
+			if data:
+				break
+		except Exception as exc:
+			if i == 2: # Last attempt
+				frappe.log_error(f"PayU Verify API final attempt error: {exc}", "PayU Verify")
+				return None
+			time.sleep(2)
+
+	# Log response for debugging
+	frappe.log_error(f"PayU RAW VERIFY RESPONSE for {mihpayid}: {data}", "PayU Debug Full")
+
+	if not data or not data.get("status") == 1:
 		return None
 
 	transaction_details = data.get("transaction_details", {})
 	# transaction_details is keyed by mihpayid
 	txn = transaction_details.get(str(mihpayid)) or {}
-
-	# Log response for debugging
-	frappe.log_error(f"PayU verify response for {mihpayid}: {txn}", "PayU Debug")
 
 	return txn
 
@@ -1467,6 +1519,11 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 	KEY CHANGE: txnid is now cached per booking_id for 1 hour to prevent 429 errors.
 	"""
 	booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
+
+	# Block payment data generation for free events
+	if booking_doc.total_amount == 0:
+		frappe.logger().info(f"PayU payment data requested for free booking {booking_id}. Blocking.")
+		frappe.throw(_("Payment is not required for free bookings"))
 
 	# Permission check
 	is_guest_session = frappe.session.user == "Guest"
@@ -1486,17 +1543,7 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 			frappe.throw(_("No payment gateway configured for this event"))
 		payment_gateway = gateways[0]
 
-	__, merchant_key, merchant_salt, is_test = _get_payu_settings()
-
-	# ------------------------------------------------------------------
-	# Cache key: one stable txnid per booking.
-	# ------------------------------------------------------------------
-	cache_key = f"payu_bolt_params:{booking_id}"
-	cached_params = frappe.cache.get_value(cache_key)
-
-	if cached_params:
-		frappe.cache.set_value(cache_key, cached_params, expires_in_sec=3600)
-		return cached_params
+	payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
 	event_title = frappe.get_cached_value("Buzz Event", booking_doc.event, "title") or "Event"
 
@@ -1511,8 +1558,11 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 		or frappe._dict()
 	)
 
-	# txnid is simply the booking ID (predictable and clean)
-	txnid = f"BUZZ-BK-{booking_id}"
+	# txnid MUST be unique for every attempt to avoid PayU duplicate errors.
+	# Format: BK-<booking_id>-<timestamp>-<random_suffix>
+	import time
+	import random
+	txnid = f"BK-{booking_id}-{int(time.time())}-{random.randint(100, 999)}"
 	amount = f"{booking_doc.total_amount:.2f}"
 	productinfo = f"Tickets: {event_title}"
 	firstname = (user_data.get("first_name") or booking_user_email.split("@")[0]).strip()
@@ -1546,7 +1596,6 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 		"booking_id": booking_id,
 	}
 
-	frappe.cache.set_value(cache_key, params, expires_in_sec=3600)
 	frappe.cache.set_value(
 		f"payu_txnid:{txnid}",
 		{
@@ -1581,7 +1630,7 @@ def confirm_payu_payment(txnid: str, mihpayid: str, status: str, received_hash: 
 	):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-	_, merchant_key, merchant_salt, is_test = _get_payu_settings()
+	payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
 	status_lower = (status or "").lower()
 
@@ -1596,6 +1645,15 @@ def confirm_payu_payment(txnid: str, mihpayid: str, status: str, received_hash: 
 	txn = _verify_payment_with_payu(merchant_key, merchant_salt, mihpayid, is_test)
 
 	if txn is None:
+		if is_test:
+			# PayU sandbox often fails or returns empty for verify_payment.
+			# We allow "success" status to pass in test mode to facilitate development.
+			frappe.log_error(f"PayU verify skipped (returning success) in TEST mode for {txnid}", "PayU Debug")
+			_mark_booking_paid(booking_id, txnid, mihpayid)
+			frappe.cache.delete_value(f"payu_txnid:{txnid}")
+			frappe.cache.delete_value(f"payu_bolt_params:{booking_id}")
+			return {"success": True, "booking_id": booking_id}
+
 		frappe.throw(
 			_("Could not verify payment with PayU. Please contact support with your booking ID: {0}").format(
 				booking_id
@@ -1631,6 +1689,9 @@ def confirm_payu_payment(txnid: str, mihpayid: str, status: str, received_hash: 
 
 	_mark_booking_paid(booking_id, txnid, mihpayid)
 
+	# Final logging for confirmation success
+	frappe.log_error(f"Confirm API success: txnid={txnid}, mihpayid={mihpayid}, booking={booking_id}", "PayU Debug")
+
 	# Clear cache entries on success
 	frappe.cache.delete_value(f"payu_txnid:{txnid}")
 	frappe.cache.delete_value(f"payu_bolt_params:{booking_id}")
@@ -1651,7 +1712,8 @@ def payu_payment_callback(**kwargs):
 		return
 
 	try:
-		_, merchant_key, merchant_salt, _ = _get_payu_settings()
+		# use ignore instead of _ to avoid overwriting frappe's translation function
+		ignore, merchant_key, merchant_salt, ignore2 = _get_payu_settings()
 	except Exception:
 		return
 
@@ -1720,3 +1782,5 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 	booking_doc.flags.ignore_permissions = True
 	booking_doc.submit()
 	frappe.db.commit()
+
+	frappe.log_error(f"Booking marked paid and submitted: {booking_id}", "PayU Success Log")
