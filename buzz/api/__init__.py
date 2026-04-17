@@ -1503,7 +1503,6 @@ def _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test):
 		"command": "verify_payment",
 	}
 
-	import time
 	data = {}
 	for i in range(3):
 		try:
@@ -1524,8 +1523,9 @@ def _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test):
 				return None
 			time.sleep(2)
 
-	# Log response for debugging
-	frappe.log_error(f"PayU RAW VERIFY RESPONSE for {txnid}: {data}", "PayU Debug Full")
+	# Log response for debugging (Test mode only)
+	if is_test:
+		frappe.log_error(f"PayU RAW VERIFY RESPONSE for {txnid}: {data}", "PayU Debug Full")
 
 	if not data or str(data.get("status")) != "1":
 		return None
@@ -1658,8 +1658,11 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 	  3. Local Reverse Hash Check (Matches client data against our secret salt)
 	  4. Server-side API Check (verify_payment API)
 	"""
-	# Log form_dict for debugging (can be disabled in high-traffic production)
-	frappe.log_error(f"PayU Confirm Data: {frappe.form_dict}", "PayU Debug Params")
+	payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
+
+	# Log form_dict for debugging (Test mode only)
+	if is_test:
+		frappe.log_error(f"PayU Confirm Data: {frappe.form_dict}", "PayU Debug Params")
 
 	# 0. Normalization
 	payu_response = payu_response or frappe.form_dict.get("payu_response")
@@ -1693,15 +1696,26 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 		
 		if not booking_id or not frappe.db.exists("Event Booking", booking_id):
 			frappe.log_error(f"Booking session missing or expired for {txnid}. Recovered: {booking_id}", "PayU Error")
-			frappe.throw(_("Payment session expired or invalid booking ID. Quote: {0}").format(txnid))
+			# Strict Security Check
+			frappe.throw(_("Invalid booking reference. Quote: {0}").format(txnid))
 
-		expected_amount = float((cached or {}).get("amount") or 0)
-		expected_email = str((cached or {}).get("email") or "").lower().strip()
-
-		payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
+		# Recover integrity data from DB if cache expired
+		if cached:
+			expected_amount = float(cached.get("amount") or 0)
+			expected_email = str(cached.get("email") or "").lower().strip()
+		else:
+			# Cache expired, trust the DB record amount
+			booking_data = frappe.db.get_value("Event Booking", booking_id, ["total_amount", "user"], as_dict=1)
+			expected_amount = float(booking_data.get("total_amount") or 0)
+			expected_email = str(booking_data.get("user") or "").lower().strip()
 
 		# 3. Filter Non-Success Statuses
-		status_check = (status or res.get("unmappedstatus") or "").lower()
+		status_check = (
+			status
+			or res.get("status") 
+			or res.get("unmappedstatus") 
+			or ""
+		).lower()
 		if status_check not in ("success", "captured"):
 			frappe.cache.delete_value(f"payu_txnid:{txnid}")
 			return {"success": False, "booking_id": booking_id, "status": status}
@@ -1729,10 +1743,11 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 
 		expected_hash = hashlib.sha512(reverse_str.encode()).hexdigest().lower()
 		
-		# Keep Deep Debug (for one-character-level troubleshooting)
-		debug_msg = f"TXNID: {txnid}\nRAW STR: {reverse_str}\n"
-		debug_msg += f"EXPECTED: {expected_hash}\nRECEIVED: {res.get('hash')}"
-		frappe.log_error(debug_msg, "PayU Hash Debug")
+		# Only log deep hash debug in test mode
+		if is_test:
+			debug_msg = f"TXNID: {txnid}\nRAW STR: {reverse_str}\n"
+			debug_msg += f"EXPECTED: {expected_hash}\nRECEIVED: {res.get('hash')}"
+			frappe.log_error(debug_msg, "PayU Hash Debug")
 
 		hash_verified = bool(res.get("hash") and expected_hash.lower() == res.get("hash").lower())
 
@@ -1743,9 +1758,14 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 		except (ValueError, TypeError):
 			paid_amount = 0.0
 
-		if abs(paid_amount - expected_amount) > 0.01:
-			frappe.log_error(f"PayU Security Alert: Amount mismatch for {txnid}. Expected {expected_amount}, Got {paid_amount}", "PayU Security")
-			frappe.throw(_("Security Error: Payment amount mismatch."))
+		# Skip validation for invalid / zero bookings
+		if expected_amount <= 0:
+			if is_test:
+				frappe.log_error(f"Skipping amount validation for {txnid} (expected_amount={expected_amount})", "PayU Security")
+		else:
+			if abs(paid_amount - expected_amount) > 0.01:
+				frappe.log_error(f"PayU Security Alert: Amount mismatch for {txnid}. Expected {expected_amount}, Got {paid_amount}", "PayU Security")
+				frappe.throw(_("Security Error: Payment amount mismatch."))
 
 		# B) Email/Identity Check (Enterprise Guard)
 		paid_email = str(res.get("email") or "").lower().strip()
@@ -1755,9 +1775,10 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 				frappe.throw(_("Security Error: Payment email mismatch."))
 
 		# C) Hash Check
-		if not hash_verified and not is_test:
+		if not hash_verified:
 			frappe.log_error(f"PayU hash mismatch for {txnid}. Expected {expected_hash}, Got {res.get('hash')}", "PayU Security")
-			frappe.throw(_("Security Error: Hash verification failed. Please contact support."))
+			if not is_test:
+				frappe.throw(_("Security Error: Hash verification failed. Please contact support."))
 
 		# 5. Server-to-Server Verification (Standardized: Use txnid)
 		txn_api_data = _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test)
@@ -1838,14 +1859,15 @@ def payu_payment_callback(**kwargs):
 
 	expected_hash = hashlib.sha512(reverse_str.encode()).hexdigest().lower()
 	
-	# Production Debugging
-	frappe.log_error(
-		f"CALLBACK TXNID: {txnid}\n"
-		f"RAW REVERSE STR: {reverse_str}\n"
-		f"EXPECTED HASH: {expected_hash}\n"
-		f"RECEIVED HASH: {res.get('hash')}", 
-		"PayU Hash Debug"
-	)
+	# Production Debugging (Test mode only)
+	if ignore2: # is_test
+		frappe.log_error(
+			f"CALLBACK TXNID: {txnid}\n"
+			f"RAW REVERSE STR: {reverse_str}\n"
+			f"EXPECTED HASH: {expected_hash}\n"
+			f"RECEIVED HASH: {res.get('hash')}", 
+			"PayU Hash Debug"
+		)
 
 	if expected_hash.lower() != (received_hash or "").lower():
 		frappe.log_error(f"PayU callback hash mismatch for txnid {txnid}. Expected {expected_hash}, got {received_hash}", "PayU Callback")
@@ -1862,6 +1884,7 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 	booking_doc = frappe.get_doc("Event Booking", booking_id)
 
 	if booking_doc.docstatus == 1:
+		frappe.logger().info(f"Skipping already submitted booking {booking_id}")
 		return  # Already submitted
 
 	payment_doc_name = frappe.db.get_value(
@@ -1871,6 +1894,11 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 	)
 
 	if not payment_doc_name:
+		# FIX: Prevent duplicate payment creation (Idempotency)
+		existing = frappe.db.exists("Event Payment", {"order_id": txnid})
+		if existing:
+			return
+
 		# FIX: Force create Event Payment if it doesn't exist
 		payment = frappe.get_doc({
 			"doctype": "Event Payment",
