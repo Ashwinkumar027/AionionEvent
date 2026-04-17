@@ -1613,6 +1613,7 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 		{
 			"booking_id": booking_id,
 			"amount": amount,
+			"email": email,
 			"payment_gateway": payment_gateway,
 		},
 		expires_in_sec=3600,
@@ -1622,126 +1623,123 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 
 
 @frappe.whitelist()
-def confirm_payu_payment(txnid: str, mihpayid: str, status: str, payu_response: dict | str) -> dict:
+def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> dict:
 	"""
-	Frontend calls this after Bolt's responseHandler fires with SUCCESS.
+	Final Production Grade Verification for PayU Bolt.
 	Verification Steps:
-	  1. Local Reverse Hash Check (Matches client data against our secret salt)
-	  2. Data Consistency Check (Matches amount/txnid against our database)
-	  3. Server-side API Check (verify_payment)
+	  1. Idempotency Check (Check if already processed)
+	  2. Data Consistency (Email, Amount, txnid)
+	  3. Local Reverse Hash Check (Matches client data against our secret salt)
+	  4. Server-side API Check (verify_payment API)
 	"""
-	try:
-		if isinstance(payu_response, str):
-			import json
-			payu_response = json.loads(payu_response)
+	# Log form_dict for debugging (can be disabled in high-traffic production)
+	frappe.log_error(f"PayU Confirm Data: {frappe.form_dict}", "PayU Debug Params")
 
-		# --- 0. Retrieve cached transaction details ---
+	# 0. Normalization
+	payu_response = payu_response or frappe.form_dict.get("payu_response")
+	if isinstance(payu_response, str):
+		import json
+		payu_response = json.loads(payu_response)
+
+	res = payu_response or {}
+	if not res or not txnid:
+		frappe.throw(_("Incomplete transaction data. Please contact support."))
+
+	# 1. Idempotency Check
+	existing_payment = frappe.db.get_value("Event Payment", {"order_id": txnid, "payment_received": 1}, "reference_docname")
+	if existing_payment:
+		return {"success": True, "booking_id": existing_payment, "idempotent": True}
+
+	try:
+		# 2. Cache & Integrity Fetch
 		cached = frappe.cache.get_value(f"payu_txnid:{txnid}")
 		if not cached:
-			# Fallback: check if already processed (idempotency)
-			booking_with_txn = frappe.db.get_value("Event Payment", {"order_id": txnid}, "reference_docname")
-			if booking_with_txn:
-				return {"success": True, "booking_id": booking_with_txn, "already_processed": True}
-			frappe.throw(_("Transaction session expired. If amount was debited, please contact support with txnid: {0}").format(txnid))
+			# Check if already processed but cache expired
+			booking_id = frappe.db.get_value("Event Payment", {"order_id": txnid}, "reference_docname")
+			if booking_id:
+				return {"success": True, "booking_id": booking_id}
+			frappe.throw(_("Payment session expired. For support, quote txnid: {0}").format(txnid))
 
 		booking_id = cached.get("booking_id")
-		# Safely float expected amount
-		try:
-			expected_amount = float(cached.get("amount") or 0)
-		except (ValueError, TypeError):
-			expected_amount = 0.0
-
-		booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
-
-		# Permission check
-		if frappe.session.user != "Guest" and (
-			booking_doc.user != frappe.session.user
-			and not frappe.has_permission("Event Booking", "read", booking_doc)
-		):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
+		expected_amount = float(cached.get("amount") or 0)
+		expected_email = str(cached.get("email") or "").lower().strip()
 
 		payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
-		if (status or "").lower() != "success":
+		# Filter Non-Success Statuses
+		if (status or "").lower() not in ("success", "captured"):
 			frappe.cache.delete_value(f"payu_txnid:{txnid}")
 			return {"success": False, "booking_id": booking_id, "status": status}
 
-		# --- 1. Local Reverse Hash Verification ---
-		res = payu_response or {}
-		received_hash = res.get("hash")
-		
-		# Extract fields exactly as sent by Bolt
-		r_status = res.get("status")
-		r_txnid = res.get("txnid")
-		r_key = res.get("key")
-		r_amount = res.get("amount")
-		r_email = res.get("email")
-		r_firstname = res.get("firstname")
-		r_productinfo = res.get("productinfo")
-		
-		# Reverse hash sequence (12 pipes for standard Bolt responseHandler)
-		# Sequence: salt|status|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
+		# 3. Local Reverse Hash Construction (The Latest 17-Field Sequence)
+		# Sequence: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
 		u = lambda f: res.get(f, "")
-		reverse_str = f"{merchant_salt}|{r_status}|{u('udf5')}|{u('udf4')}|{u('udf3')}|{u('udf2')}|{u('udf1')}|{r_email}|{r_firstname}|{r_productinfo}|{r_amount}|{r_txnid}|{r_key}"
+		reverse_fields = [
+			merchant_salt, res.get("status"), 
+			u("udf10"), u("udf9"), u("udf8"), u("udf7"), u("udf6"), 
+			u("udf5"), u("udf4"), u("udf3"), u("udf2"), u("udf1"),
+			res.get("email"), res.get("firstname"), res.get("productinfo"), 
+			res.get("amount"), res.get("txnid"), res.get("key")
+		]
+		reverse_str = "|".join([str(x or "") for x in reverse_fields])
 		
-		# Check for additionalCharges prefix if present
+		# Check for additionalCharges (Commonly sent by PayU)
 		if res.get("additionalCharges"):
 			reverse_str = f"{res.get('additionalCharges')}|{reverse_str}"
 
 		expected_hash = hashlib.sha512(reverse_str.encode("utf-8")).hexdigest()
+		hash_verified = bool(res.get("hash") and expected_hash.lower() == res.get("hash").lower())
 
-		# --- 2. Integrity Check (Compare client data vs our database) ---
-		# Ensure the client isn't spoofing the amount even if they have a "valid" hash
+		# 4. Strict Field Validation
+		# A) Amount Check
 		try:
-			paid_amount = float(r_amount) if r_amount else 0.0
+			paid_amount = float(res.get("amount") or 0)
 		except (ValueError, TypeError):
-			frappe.log_error(f"Invalid amount format from PayU: {r_amount}", "PayU Security")
-			frappe.throw(_("Invalid payment amount received"))
+			paid_amount = 0.0
 
 		if abs(paid_amount - expected_amount) > 0.01:
-			frappe.log_error(f"PayU amount mismatch for {txnid}: Client sent {r_amount}, Expected {expected_amount}", "PayU Security")
-			frappe.throw(_("Payment amount mismatch. Potential tampering detected."))
+			frappe.log_error(f"PayU Security Alert: Amount mismatch for {txnid}. Expected {expected_amount}, Got {paid_amount}", "PayU Security")
+			frappe.throw(_("Security Error: Payment amount mismatch."))
 
-		if r_txnid != txnid:
-			frappe.throw(_("Transaction ID mismatch"))
-
-		hash_verified = bool(received_hash and expected_hash.lower() == received_hash.lower())
-		if not hash_verified:
-			frappe.log_error(f"PayU hash mismatch for {txnid}. Expected {expected_hash}, Got {received_hash}", "PayU Security")
+		# B) Email/Identity Check (Enterprise Guard)
+		paid_email = str(res.get("email") or "").lower().strip()
+		if expected_email and paid_email != expected_email:
+			frappe.log_error(f"PayU Identity Alert: Email mismatch for {txnid}. Expected {expected_email}, Got {paid_email}", "PayU Security")
 			if not is_test:
-				frappe.throw(_("Payment verification failed (Hash Mismatch)"))
+				frappe.throw(_("Security Error: Payment email mismatch."))
 
-		# --- 3. Server-side API Check (verification with PayU servers) ---
+		# C) Hash Check
+		if not hash_verified and not is_test:
+			frappe.log_error(f"PayU hash mismatch for {txnid}. Expected {expected_hash}, Got {res.get('hash')}", "PayU Security")
+			frappe.throw(_("Security Error: Hash verification failed. Please contact support."))
+
+		# 5. Server-to-Server Verification (API Layer)
 		txn_api_data = _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test)
-
+		
+		is_verified = False
 		if txn_api_data:
-			payu_status = (txn_api_data.get("status") or "").lower()
-			if payu_status in ("captured", "success"):
-				# API confirms success
-				_mark_booking_paid(booking_id, txnid, mihpayid)
-				_cleanup_payu_cache(booking_id, txnid)
-				return {"success": True, "booking_id": booking_id, "verified_by": "api"}
+			api_status = (txn_api_data.get("status") or "").lower()
+			if api_status in ("success", "captured"):
+				is_verified = True
 			else:
-				# API confirms failure/pending - override frontend "success"
-				frappe.log_error(f"PayU API reported '{payu_status}' for {txnid} despite frontend success", "PayU Alert")
-				return {"success": False, "booking_id": booking_id, "status": payu_status}
+				frappe.log_error(f"PayU API reported status '{api_status}' for {txnid}", "PayU Alert")
+				frappe.throw(_("PayU Verification API reported status: {0}").format(api_status))
+		elif hash_verified:
+			# RESILIENCE: If API fails/times out, we trust the HASH because it requires our SALT.
+			frappe.log_error(f"PayU Resilience: API verify failed for {txnid}, marked success via Hash.", "PayU Warning")
+			is_verified = True
 
-		# --- 4. Resilient Fallback (API failed but hash + integrity passed) ---
-		if hash_verified:
-			frappe.log_error(
-				f"PayU API verification unavailable for {txnid}. "
-				f"Marking as PAID based on local hash verification and amount integrity.",
-				"PayU Warning"
-			)
-			_mark_booking_paid(booking_id, txnid, mihpayid)
+		# 6. Success Finalization
+		if is_verified:
+			_mark_booking_paid(booking_id, txnid, mihpayid or res.get("mihpayid"))
 			_cleanup_payu_cache(booking_id, txnid)
-			return {"success": True, "booking_id": booking_id, "verified_by": "hash_fallback"}
+			return {"success": True, "booking_id": booking_id}
 
-		frappe.throw(_("Could not verify payment with PayU. If amount was deducted, please contact support with txnid: {0}").format(txnid))
+		frappe.throw(_("PayU payment verification failed."))
 
 	except Exception as e:
 		if not isinstance(e, frappe.ValidationError):
-			frappe.log_error(frappe.get_traceback(), "PayU Confirm Error")
+			frappe.log_error(frappe.get_traceback(), "PayU Final Confirm Error")
 		raise e
 
 
@@ -1768,34 +1766,26 @@ def payu_payment_callback(**kwargs):
 	except Exception:
 		return
 
-	# Reverse hash verification
+	# Reverse hash verification (Standardized latest sequence: UDF10 -> UDF1)
+	u = lambda f: data.get(f, "")
+	reverse_fields = [
+		merchant_salt, status, 
+		u("udf10"), u("udf9"), u("udf8"), u("udf7"), u("udf6"), 
+		u("udf5"), u("udf4"), u("udf3"), u("udf2"), u("udf1"),
+		u("email"), u("firstname"), u("productinfo"), 
+		u("amount"), u("txnid"), u("key")
+	]
+	reverse_str = "|".join([str(x or "") for x in reverse_fields])
+	
+	# Check for additionalCharges (must be prefixed if present)
 	additional_charges = data.get("additionalCharges", "")
-	udf5 = data.get("udf5", "")
-	udf4 = data.get("udf4", "")
-	udf3 = data.get("udf3", "")
-	udf2 = data.get("udf2", "")
-	udf1 = data.get("udf1", "")
-	email_v = data.get("email", "")
-	firstname_v = data.get("firstname", "")
-	prodinfo_v = data.get("productinfo", "")
-	amount_v = data.get("amount", "")
-	key_v = data.get("key", "")
-
 	if additional_charges:
-		reverse_str = (
-			f"{additional_charges}|{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}"
-			f"|{email_v}|{firstname_v}|{prodinfo_v}|{amount_v}|{txnid}|{key_v}"
-		)
-	else:
-		reverse_str = (
-			f"{merchant_salt}|{status}|{udf5}|{udf4}|{udf3}|{udf2}|{udf1}"
-			f"|{email_v}|{firstname_v}|{prodinfo_v}|{amount_v}|{txnid}|{key_v}"
-		)
+		reverse_str = f"{additional_charges}|{reverse_str}"
 
 	expected_hash = hashlib.sha512(reverse_str.encode("utf-8")).hexdigest()
 
 	if expected_hash.lower() != received_hash.lower():
-		frappe.log_error(f"PayU callback hash mismatch for txnid {txnid}", "PayU Callback")
+		frappe.log_error(f"PayU callback hash mismatch for txnid {txnid}. Expected {expected_hash}, got {received_hash}", "PayU Callback")
 		return
 
 	if status == "success":

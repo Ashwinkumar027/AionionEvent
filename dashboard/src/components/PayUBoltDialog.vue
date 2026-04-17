@@ -418,7 +418,7 @@ async function initPayment() {
               txnid:         payuParams.txnid,
               mihpayid:      response.mihpayid || "",
               status:        "success",
-              received_hash: response.hash || "",
+              payu_response: response,
             });
 
             if (result?.success) {
