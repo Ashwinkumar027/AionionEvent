@@ -1869,7 +1869,22 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 		{"reference_docname": booking_id, "reference_doctype": "Event Booking"},
 		"name",
 	)
-	if payment_doc_name:
+
+	if not payment_doc_name:
+		# FIX: Force create Event Payment if it doesn't exist
+		payment = frappe.get_doc({
+			"doctype": "Event Payment",
+			"reference_doctype": "Event Booking",
+			"reference_docname": booking_id,
+			"amount": booking_doc.total_amount,
+			"currency": booking_doc.currency,
+			"payment_received": 1,
+			"payment_id": mihpayid,
+			"order_id": txnid,
+			"status": "Success"
+		})
+		payment.insert(ignore_permissions=True)
+	else:
 		frappe.db.set_value(
 			"Event Payment",
 			payment_doc_name,
@@ -1877,11 +1892,15 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 				"payment_received": 1,
 				"payment_id": mihpayid,
 				"order_id": txnid,
+				"status": "Success",
 			},
 		)
-	else:
-		frappe.log_error(f"No Event Payment found for {booking_id}", "PayU Warning")
 
+	# Set the correct statuses to remove "Unpaid" and "Offline" warnings
+	booking_doc.payment_status = "Paid"
+	booking_doc.status = "Confirmed"
+	booking_doc.payment_method = "PayU"
+	
 	booking_doc.flags.ignore_permissions = True
 	booking_doc.submit()
 	frappe.db.commit()

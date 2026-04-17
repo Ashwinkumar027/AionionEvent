@@ -1,12 +1,20 @@
 <template>
 	<BookingHeader :booking-id="bookingId" />
 
-	<div class="w-4" v-if="bookingDetails.loading">
-		<Spinner />
+	<div class="flex items-center justify-center p-12" v-if="bookingDetails.loading">
+		<Spinner class="w-8 h-8 text-blue-600" />
 	</div>
 
 	<div v-else-if="bookingDetails.data">
-		<!-- Approval Pending Status -->
+		<!-- Success Message for Paid Bookings -->
+		<SuccessMessage
+			v-if="isPaymentSuccess"
+			class="mb-6"
+			title="Payment Successful!"
+			description="Your booking is confirmed. Your tickets are ready below."
+		/>
+
+		<!-- Approval Pending Status (Offline) -->
 		<div
 			v-if="!bookingDetails.data.event.free_webinar && isOfflinePaymentPending"
 			class="mb-6"
@@ -92,7 +100,7 @@
 
 		<!-- Tickets Section -->
 		<TicketsSection
-			v-if="!bookingDetails.data.event.free_webinar && !isOfflinePaymentPending"
+			v-if="isPaid && !bookingDetails.data.event.free_webinar"
 			:tickets="bookingDetails.data.tickets"
 			:can-request-cancellation="canRequestCancellation"
 			:can-transfer-tickets="canTransferTickets"
@@ -105,7 +113,7 @@
 		/>
 
 		<CancellationRequestDialog
-			v-if="!isOfflinePaymentPending"
+			v-if="isPaid && !isOfflinePaymentPending"
 			v-model="showCancellationDialog"
 			:tickets="bookingDetails.data.tickets"
 			:booking-id="bookingId"
@@ -120,7 +128,7 @@
 import { useBookingFormStorage } from "@/composables/useBookingFormStorage";
 import { usePaymentSuccess } from "@/composables/usePaymentSuccess";
 import { Spinner, createResource } from "frappe-ui";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import LucideClock from "~icons/lucide/clock";
 import LucideXCircle from "~icons/lucide/x-circle";
@@ -141,23 +149,31 @@ const props = defineProps({
 	},
 });
 
-// Check if this is an offline payment that is not yet verified
+// Derived status from backend data
+const isPaid = computed(() => {
+	return bookingDetails.data?.doc?.payment_status === "Paid";
+});
+
+// Check if this is an offline payment that is waiting for manual verification
 const isOfflinePaymentPending = computed(() => {
-	return bookingDetails.data?.doc?.status === "Approval Pending";
+	// Only show "Pending Verification" if not already paid and explicitly in Approval Pending state
+	return !isPaid.value && bookingDetails.data?.doc?.status === "Approval Pending";
 });
 
 const isBookingRejected = computed(() => {
 	return bookingDetails.data?.doc?.status === "Rejected";
 });
 
-// Check if this is a successful payment redirect (check URL immediately)
-const isPaymentSuccess = route.query.success === "true";
+// Detect success from either the URL redirect OR the actual verified payment status
+const isPaymentSuccess = computed(() => {
+	return route.query.success === "true" || isPaid.value;
+});
+
 const isConfirmationPending = route.query.offline === "true";
 
-// Use payment success composable for UI effects (confetti, message, URL cleanup)
-// Disable confetti when booking is pending approval (e.g. offline payments)
+// Use payment success composable for confetti and success messages
 const { showSuccessMessage } = usePaymentSuccess({
-	enableConfetti: !isConfirmationPending,
+	enableConfetti: isPaid.value && !isConfirmationPending,
 });
 
 const showCancellationDialog = ref(false);
@@ -203,4 +219,11 @@ const onTicketTransferSuccess = () => {
 const onCancellationRequestSuccess = (data) => {
 	bookingDetails.reload();
 };
+
+onMounted(() => {
+	// If redirected from successful payment, force a fresh load to bypass any cache
+	if (isPaymentSuccess) {
+		bookingDetails.reload();
+	}
+});
 </script>
