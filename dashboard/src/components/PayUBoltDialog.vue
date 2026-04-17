@@ -415,9 +415,10 @@ async function initPayment() {
 
           try {
             const result = await confirmPayment.submit({
-              ...response, // Spread PayU response (amount, hash, productinfo, email, firstname, udfs, additionalCharges etc.)
-              txnid:         payuParams.txnid, // Ensure txnid matches what we generated
-              status:        "success", // Normalize status for backend logic
+              txnid:         payuParams.txnid,
+              mihpayid:      response.mihpayid || "",
+              status:        "success",
+              payu_response: response,
             });
 
             if (result?.success) {
