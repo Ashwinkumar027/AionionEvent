@@ -1464,8 +1464,18 @@ def _compute_forward_hash(
 
 
 def _extract_booking_id(txnid: str) -> str:
-	"""Extract original booking ID from txnid by stripping the random suffix."""
+	"""
+	Extract original booking ID from txnid.
+	Format: BK-<id>-<timestamp>-<suffix> or <id>-<suffix>
+	"""
 	if "-" in txnid:
+		# If we have 3 or more dashes, it's our composite format.
+		# BK-B081-1776417239-261 -> BK-B081
+		parts = txnid.split("-")
+		if len(parts) >= 4 and parts[0] == "BK":
+			return f"{parts[0]}-{parts[1]}"
+		
+		# Generic fallback: strip only the last part
 		return txnid.rsplit("-", 1)[0]
 	return txnid
 
@@ -1666,20 +1676,26 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 		return {"success": True, "booking_id": existing_payment, "idempotent": True}
 
 	try:
-		# 2. Extract Booking ID (handles multi-dash names)
-		booking_id = _extract_booking_id(txnid)
-		
-		# 3. Cache & Integrity Fetch
+		# 2. Cache & Integrity Fetch (Primary Source: Cache)
 		cached = frappe.cache.get_value(f"payu_txnid:{txnid}")
-		if not cached:
-			# Check already processed but cache expired
+		
+		if cached:
+			booking_id = cached.get("booking_id")
+		else:
+			# Fallback 1: Extract from string if cache missing
+			booking_id = _extract_booking_id(txnid)
+			
+			# Fallback 2: Check DB if already processed
 			existing_booking_id = frappe.db.get_value("Event Payment", {"order_id": txnid}, "reference_docname")
 			if existing_booking_id:
 				return {"success": True, "booking_id": existing_booking_id}
-			frappe.throw(_("Payment session expired. For support, quote txnid: {0}").format(txnid))
+		
+		if not booking_id or not frappe.db.exists("Event Booking", booking_id):
+			frappe.log_error(f"Booking session missing or expired for {txnid}. Recovered: {booking_id}", "PayU Error")
+			frappe.throw(_("Payment session expired or invalid booking ID. Quote: {0}").format(txnid))
 
-		expected_amount = float(cached.get("amount") or 0)
-		expected_email = str(cached.get("email") or "").lower().strip()
+		expected_amount = float((cached or {}).get("amount") or 0)
+		expected_email = str((cached or {}).get("email") or "").lower().strip()
 
 		payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
