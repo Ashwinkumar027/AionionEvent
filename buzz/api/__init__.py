@@ -1666,28 +1666,30 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 
 		payu_settings, merchant_key, merchant_salt, is_test = _get_payu_settings()
 
-		# Filter Non-Success Statuses
-		if (status or "").lower() not in ("success", "captured"):
+		# 3. Filter Non-Success Statuses
+		status_check = (status or res.get("unmappedstatus") or "").lower()
+		if status_check not in ("success", "captured"):
 			frappe.cache.delete_value(f"payu_txnid:{txnid}")
 			return {"success": False, "booking_id": booking_id, "status": status}
 
-		# 3. Local Reverse Hash Construction (The Latest 17-Field Sequence)
-		# Sequence: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
+		# --- FINAL FIX (from image) ---
 		u = lambda f: res.get(f, "")
-		reverse_fields = [
-			merchant_salt, res.get("status"), 
-			u("udf10"), u("udf9"), u("udf8"), u("udf7"), u("udf6"), 
-			u("udf5"), u("udf4"), u("udf3"), u("udf2"), u("udf1"),
-			res.get("email"), res.get("firstname"), res.get("productinfo"), 
-			res.get("amount"), res.get("txnid"), res.get("key")
-		]
-		reverse_str = "|".join([str(x or "") for x in reverse_fields])
 		
-		# Check for additionalCharges (Commonly sent by PayU)
+		reverse_str = (
+			f"{merchant_salt}|{res.get('status')}|"
+			f"{u('udf5')}|{u('udf4')}|{u('udf3')}|{u('udf2')}|{u('udf1')}|"
+			f"{res.get('email')}|{res.get('firstname')}|{res.get('productinfo')}|"
+			f"{res.get('amount')}|{res.get('txnid')}|{res.get('key')}"
+		)
+		
 		if res.get("additionalCharges"):
 			reverse_str = f"{res.get('additionalCharges')}|{reverse_str}"
 
-		expected_hash = hashlib.sha512(reverse_str.encode("utf-8")).hexdigest()
+		expected_hash = hashlib.sha512(reverse_str.encode()).hexdigest()
+		
+		# Production Logging
+		frappe.log_error(f"Expected: {expected_hash}, Received: {res.get('hash')}", "PayU Hash Debug")
+
 		hash_verified = bool(res.get("hash") and expected_hash.lower() == res.get("hash").lower())
 
 		# 4. Strict Field Validation
@@ -1714,7 +1716,8 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 			frappe.throw(_("Security Error: Hash verification failed. Please contact support."))
 
 		# 5. Server-to-Server Verification (API Layer)
-		txn_api_data = _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test)
+		_mihpayid = mihpayid or res.get("mihpayid")
+		txn_api_data = _verify_payment_with_payu(merchant_key, merchant_salt, _mihpayid or txnid, is_test)
 		
 		is_verified = False
 		if txn_api_data:
@@ -1733,6 +1736,10 @@ def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> di
 		if is_verified:
 			_mark_booking_paid(booking_id, txnid, mihpayid or res.get("mihpayid"))
 			_cleanup_payu_cache(booking_id, txnid)
+			
+			# Extra success log
+			frappe.log_error(f"Payment SUCCESS: {booking_id}, txnid={txnid}", "PayU Final Success")
+			
 			return {"success": True, "booking_id": booking_id}
 
 		frappe.throw(_("PayU payment verification failed."))
@@ -1766,29 +1773,30 @@ def payu_payment_callback(**kwargs):
 	except Exception:
 		return
 
-	# Reverse hash verification (Standardized latest sequence: UDF10 -> UDF1)
-	u = lambda f: data.get(f, "")
-	reverse_fields = [
-		merchant_salt, status, 
-		u("udf10"), u("udf9"), u("udf8"), u("udf7"), u("udf6"), 
-		u("udf5"), u("udf4"), u("udf3"), u("udf2"), u("udf1"),
-		u("email"), u("firstname"), u("productinfo"), 
-		u("amount"), u("txnid"), u("key")
-	]
-	reverse_str = "|".join([str(x or "") for x in reverse_fields])
+	# --- FINAL FIX (from image) ---
+	res = data # align names with the snippet
+	u = lambda f: res.get(f, "")
 	
-	# Check for additionalCharges (must be prefixed if present)
-	additional_charges = data.get("additionalCharges", "")
-	if additional_charges:
-		reverse_str = f"{additional_charges}|{reverse_str}"
+	reverse_str = (
+		f"{merchant_salt}|{status}|"
+		f"{u('udf5')}|{u('udf4')}|{u('udf3')}|{u('udf2')}|{u('udf1')}|"
+		f"{u('email')}|{u('firstname')}|{u('productinfo')}|"
+		f"{u('amount')}|{u('txnid')}|{u('key')}"
+	)
+	
+	if res.get("additionalCharges"):
+		reverse_str = f"{res.get('additionalCharges')}|{reverse_str}"
 
-	expected_hash = hashlib.sha512(reverse_str.encode("utf-8")).hexdigest()
+	expected_hash = hashlib.sha512(reverse_str.encode()).hexdigest()
+	
+	# Production Logging
+	frappe.log_error(f"Expected: {expected_hash}, Received: {res.get('hash')}", "PayU Hash Debug")
 
 	if expected_hash.lower() != received_hash.lower():
 		frappe.log_error(f"PayU callback hash mismatch for txnid {txnid}. Expected {expected_hash}, got {received_hash}", "PayU Callback")
 		return
 
-	if status == "success":
+	if status in ("success", "captured"):
 		booking_id = cached.get("booking_id")
 		_mark_booking_paid(booking_id, txnid, data.get("mihpayid", ""))
 		frappe.cache.delete_value(f"payu_txnid:{txnid}")
