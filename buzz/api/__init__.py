@@ -1881,7 +1881,8 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 			"payment_received": 1,
 			"payment_id": mihpayid,
 			"order_id": txnid,
-			"status": "Success"
+			"user": booking_doc.user,
+			"payment_gateway": "PayU"
 		})
 		payment.insert(ignore_permissions=True)
 	else:
@@ -1892,7 +1893,6 @@ def _mark_booking_paid(booking_id: str, txnid: str, mihpayid: str):
 				"payment_received": 1,
 				"payment_id": mihpayid,
 				"order_id": txnid,
-				"status": "Success",
 			},
 		)
 
