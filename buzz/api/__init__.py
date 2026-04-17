@@ -1466,16 +1466,16 @@ def _compute_forward_hash(
 def _extract_booking_id(txnid: str) -> str:
 	"""
 	Extract original booking ID from txnid.
-	Format: BK-<id>-<timestamp>-<suffix> or <id>-<suffix>
+	Format: <booking_id>-<timestamp>-<random_suffix>
+	We strip the last two parts (timestamp and suffix).
 	"""
 	if "-" in txnid:
-		# If we have 3 or more dashes, it's our composite format.
-		# BK-B081-1776417239-261 -> BK-B081
 		parts = txnid.split("-")
-		if len(parts) >= 4 and parts[0] == "BK":
-			return f"{parts[0]}-{parts[1]}"
+		if len(parts) >= 3:
+			# Remove last two parts: timestamp and suffix
+			return "-".join(parts[:-2])
 		
-		# Generic fallback: strip only the last part
+		# Fallback: strip only one part
 		return txnid.rsplit("-", 1)[0]
 	return txnid
 
@@ -1587,10 +1587,9 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 		or frappe._dict()
 	)
 
-	# txnid MUST be unique for every attempt to avoid PayU duplicate errors.
-	# Format: BK-<booking_id>-<timestamp>-<random_suffix>
-	import time, random
-	txnid = f"BK-{booking_id}-{int(time.time())}-{random.randint(100, 999)}"
+	# Format: <booking_id>-<timestamp>-<random_suffix>
+	# Using raw booking_id as base ensures Recovered ID matches DB Record.
+	txnid = f"{booking_id}-{int(time.time())}-{random.randint(100, 999)}"
 	
 	# 1. & 2. & 3. Amount and ProductInfo fixes
 	# Strategy: Set productinfo EQUAL to txnid to avoid all sanitization mismatches
