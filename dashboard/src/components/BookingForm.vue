@@ -1353,8 +1353,6 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 		},
 		{
 			onSuccess: (data) => {
-				clearBookingCache();
-
 				if (isOtpFlow) {
 					clearOtpState();
 				}
@@ -1375,11 +1373,20 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 					!data.payment_link &&
 					data.booking_name
 				) {
+					// NOTE: Do NOT call clearBookingCache() here.
+					// Clearing localStorage immediately resets the form's reactive
+					// state (attendees, ticket types) which drops finalTotal to 0 and
+					// causes the background form to render as "Free Event" while
+					// the PayU dialog is open.
+					// Cache is cleared in onPayUSuccess() after payment is confirmed.
 					pendingPayUBookingId.value = data.booking_name;
 					pendingPayUGateway.value = paymentGateway || null;
 					showPayUBolt.value = true;
 					return;
 				}
+
+				// For all non-PayU paths, clear the booking cache now.
+				clearBookingCache();
 
 				if (data.payment_link) {
 					// Legacy path: PayU returns HTML form → intercept and use Bolt

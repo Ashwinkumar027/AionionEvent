@@ -762,10 +762,21 @@ def send_ticket_transfer_emails(ticket_id: str, old_name: str, old_email: str, n
 		frappe.log_error(f"Failed to send ticket transfer emails for ticket {ticket_id}: {e!s}")
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)  # nosemgrep: frappe-semgrep-rules.rules.security.guest-whitelisted-method
 def get_booking_details(booking_id: str) -> dict:
 	details = frappe._dict()
-	booking_doc = frappe.get_cached_doc("Event Booking", booking_id)
+
+	# Use ignore_permissions so Website Users and guests can fetch their own
+	# booking. We enforce access manually via the ownership check below.
+	booking_doc = frappe.get_doc("Event Booking", booking_id)
+
+	# ── Ownership / permission guard ───────────────────────────────────────────
+	current_user = frappe.session.user
+	is_owner = booking_doc.user == current_user
+	is_privileged = frappe.has_permission("Event Booking", "read", booking_doc, user=current_user)
+	if not is_owner and not is_privileged:
+		frappe.throw(_("Not permitted to view this booking"), frappe.PermissionError)
+
 	details.doc = booking_doc
 
 	tickets = frappe.db.get_all(

@@ -33,7 +33,7 @@
     <!-- Full-screen backdrop loader -->
     <div
       v-if="state === 'loading'"
-      class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/70 backdrop-blur-md"
+      class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white"
     >
       <div class="bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-5 max-w-sm w-full mx-4">
         <div class="relative w-14 h-14">

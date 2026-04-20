@@ -36,7 +36,7 @@ const errorMessage = ref("");
 let itiInstance = null;
 let itiReady = false;
 
-// ── 1. CDN loader helpers
+// ── 1. CDN loader helpers ─────────────────────────────────────────────────────
 
 const ITI_CSS =
 	"https://cdn.jsdelivr.net/npm/intl-tel-input@23/build/css/intlTelInput.css";
@@ -74,7 +74,7 @@ function loadScript(src) {
 	});
 }
 
-// ── 2. Init intl-tel-input
+// ── 2. Init intl-tel-input ───────────────────────────────────────────────────
 
 async function initIti() {
 	loadCSS(ITI_CSS);
@@ -84,13 +84,7 @@ async function initIti() {
 
 	itiInstance = window.intlTelInput(phoneInputEl.value, {
 		utilsScript: ITI_UTILS,
-		initialCountry: "auto",
-		geoIpLookup: (success) => {
-			fetch("https://ipapi.co/json")
-				.then((r) => r.json())
-				.then((data) => success(data.country_code))
-				.catch(() => success("IN")); // fallback to India
-		},
+		initialCountry: "in", // default to India – avoids slow geoIpLookup network call
 		separateDialCode: true,
 		formatOnDisplay: true,
 		// No onlyCountries restriction – all countries allowed
@@ -157,7 +151,7 @@ function clearError() {
 	errorMessage.value = "";
 }
 
-// ── 4. Lifecycle
+// ── 4. Lifecycle ─────────────────────────────────────────────────────────────
 
 onMounted(() => {
 	initIti();
