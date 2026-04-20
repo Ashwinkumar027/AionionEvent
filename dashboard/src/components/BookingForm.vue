@@ -688,8 +688,8 @@ const maxAttendeesPerBooking = computed(() =>
 	Math.max(1, parseInt(String(props.eventDetails?.max_attendees_per_booking ?? 1), 10) || 1)
 );
 
-/** Currently selected count (1 … maxAttendeesPerBooking). */
-const selectedAttendeeCount = ref(1);
+/** Currently selected count (1 … maxAttendeesPerBooking). Initialize from cached attendees if present. */
+const selectedAttendeeCount = ref(Math.max(1, attendees.value.length || 1));
 
 // Keep selectedAttendeeCount clamped if the event details load/change.
 watch(
@@ -1386,6 +1386,7 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 				}
 
 				// For all non-PayU paths, clear the booking cache now.
+				clearStoredData();
 				clearBookingCache();
 
 				if (data.payment_link) {
@@ -1557,6 +1558,7 @@ const submitButtonText = computed(() => {
 // ── PayU Bolt event handlers ─────────────────────────────────────────────────
 function onPayUSuccess({ bookingId }) {
 	showPayUBolt.value = false;
+	clearStoredData();
 	clearBookingCache();
 	router.replace(`/bookings/${bookingId}?success=true`);
 }

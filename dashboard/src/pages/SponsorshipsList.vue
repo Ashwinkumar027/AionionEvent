@@ -59,6 +59,7 @@
 <script setup>
 import { Badge, ListView, Spinner, createResource } from "frappe-ui";
 import { dayjsLocal } from "frappe-ui";
+import { session } from "../data/session";
 
 const columns = [
 	{ label: __("Company"), key: "company_name" },
@@ -72,7 +73,7 @@ const columns = [
 const sponsorships = createResource({
 	url: "buzz.api.get_user_sponsorship_inquiries",
 	auto: true,
-	cacheKey: "sponsorships-list",
+	cacheKey: ["sponsorships-list", session.user],
 	onError: console.error,
 	transform(data) {
 		return data.map((inquiry) => ({
