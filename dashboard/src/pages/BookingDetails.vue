@@ -16,7 +16,7 @@
 
 		<!-- Approval Pending Status (Offline) -->
 		<div
-			v-if="!bookingDetails.data.event.free_webinar && isOfflinePaymentPending"
+			v-if="!booking.event?.free_webinar && isOfflinePaymentPending"
 			class="mb-6"
 		>
 			<div class="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
@@ -69,45 +69,45 @@
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 			<!-- Event Information -->
 			<BookingEventInfo
-				v-if="bookingDetails.data.event"
-				:event="bookingDetails.data.event"
-				:venue="bookingDetails.data.venue"
+				v-if="booking.event"
+				:event="booking.event"
+				:venue="booking.venue"
 			/>
 
-			<!-- Booking Financial Summary -->
+			<!-- Booking Financial Summary (from doc) -->
 			<BookingFinancialSummary
-				v-if="!bookingDetails.data.event.free_webinar && bookingDetails.data.doc"
-				:booking="bookingDetails.data.doc"
+				v-if="!booking.event?.free_webinar && booking.doc"
+				:booking="booking.doc"
 			/>
 
-			<!-- Booking Financial Summary -->
+			<!-- Booking Financial Summary (from booking_summary) -->
 			<BookingFinancialSummary
 				v-if="
-					!bookingDetails.data.event.free_webinar &&
-					bookingDetails.data.booking_summary &&
+					!booking.event?.free_webinar &&
+					booking.booking_summary &&
 					!isOfflinePaymentPending
 				"
-				:summary="bookingDetails.data.booking_summary"
+				:summary="booking.booking_summary"
 			/>
 		</div>
 
 		<!-- Cancellation Request Section -->
 		<!-- Only show if there's a pending cancellation request (not yet submitted/accepted) -->
 		<CancellationRequestNotice
-			v-if="!bookingDetails.data.event.free_webinar && hasPendingCancellationRequest"
-			:cancellation-request="bookingDetails.data.cancellation_request"
+			v-if="!booking.event?.free_webinar && hasPendingCancellationRequest"
+			:cancellation-request="booking.cancellation_request"
 		/>
 
 		<!-- Tickets Section -->
 		<TicketsSection
-			v-if="isPaid && !bookingDetails.data.event.free_webinar"
-			:tickets="bookingDetails.data.tickets"
+			v-if="isPaid && !booking.event?.free_webinar"
+			:tickets="booking.tickets"
 			:can-request-cancellation="canRequestCancellation"
 			:can-transfer-tickets="canTransferTickets"
 			:can-change-add-ons="canChangeAddOns"
-			:cancellation-request="bookingDetails.data.cancellation_request"
-			:cancellation-requested-tickets="bookingDetails.data.cancellation_requested_tickets"
-			:cancelled-tickets="bookingDetails.data.cancelled_tickets"
+			:cancellation-request="booking.cancellation_request"
+			:cancellation-requested-tickets="booking.cancellation_requested_tickets"
+			:cancelled-tickets="booking.cancelled_tickets"
 			@request-cancellation="showCancellationDialog = true"
 			@transfer-success="onTicketTransferSuccess"
 		/>
@@ -115,10 +115,10 @@
 		<CancellationRequestDialog
 			v-if="isPaid && !isOfflinePaymentPending"
 			v-model="showCancellationDialog"
-			:tickets="bookingDetails.data.tickets"
+			:tickets="booking.tickets"
 			:booking-id="bookingId"
-			:cancellation-requested-tickets="bookingDetails.data.cancellation_requested_tickets"
-			:cancelled-tickets="bookingDetails.data.cancelled_tickets"
+			:cancellation-requested-tickets="booking.cancellation_requested_tickets"
+			:cancelled-tickets="booking.cancelled_tickets"
 			@success="onCancellationRequestSuccess"
 		/>
 	</div>
@@ -149,19 +149,33 @@ const props = defineProps({
 	},
 });
 
+/**
+ * Normalize the API response shape.
+ *
+ * Frappe Cloud (staging) wraps whitelisted method responses in a `message`
+ * key: `{ message: { event, doc, tickets, ... } }`.
+ * Local dev returns the dict directly: `{ event, doc, tickets, ... }`.
+ *
+ * This computed property transparently handles both shapes so the rest of
+ * the component never needs to care which environment it's running in.
+ */
+const booking = computed(() => {
+	return bookingDetails.data?.message || bookingDetails.data || {};
+});
+
 // Derived status from backend data
 const isPaid = computed(() => {
-	return bookingDetails.data?.doc?.payment_status === "Paid";
+	return booking.value?.doc?.payment_status === "Paid";
 });
 
 // Check if this is an offline payment that is waiting for manual verification
 const isOfflinePaymentPending = computed(() => {
 	// Only show "Pending Verification" if not already paid and explicitly in Approval Pending state
-	return !isPaid.value && bookingDetails.data?.doc?.status === "Approval Pending";
+	return !isPaid.value && booking.value?.doc?.status === "Approval Pending";
 });
 
 const isBookingRejected = computed(() => {
-	return bookingDetails.data?.doc?.status === "Rejected";
+	return booking.value?.doc?.status === "Rejected";
 });
 
 // Detect success from either the URL redirect OR the actual verified payment status
@@ -173,7 +187,7 @@ const isConfirmationPending = route.query.offline === "true";
 
 // Use payment success composable for confetti and success messages
 const { showSuccessMessage } = usePaymentSuccess({
-	enableConfetti: isPaid.value && !isConfirmationPending,
+	enableConfetti: computed(() => isPaid.value && !isConfirmationPending),
 });
 
 const showCancellationDialog = ref(false);
@@ -183,30 +197,32 @@ const bookingDetails = createResource({
 	params: { booking_id: props.bookingId },
 	auto: true,
 	onSuccess: (data) => {
+		// Unwrap message key if present (Frappe Cloud wraps responses)
+		const normalized = data?.message || data || {};
 		// Clear stored booking form data if this was a successful payment
-		if (isPaymentSuccess && data?.event?.route) {
-			const { clearStoredData } = useBookingFormStorage(data.event.route);
+		if (isPaymentSuccess.value && normalized?.event?.route) {
+			const { clearStoredData } = useBookingFormStorage(normalized.event.route);
 			clearStoredData();
 		}
 	},
 });
 
 const canTransferTickets = computed(() => {
-	return bookingDetails.data?.can_transfer_ticket?.can_transfer || false;
+	return booking.value?.can_transfer_ticket?.can_transfer || false;
 });
 
 const canChangeAddOns = computed(() => {
-	return bookingDetails.data?.can_change_add_ons?.can_change_add_ons || false;
+	return booking.value?.can_change_add_ons?.can_change_add_ons || false;
 });
 
 const canRequestCancellation = computed(() => {
-	return bookingDetails.data?.can_request_cancellation?.can_request_cancellation || false;
+	return booking.value?.can_request_cancellation?.can_request_cancellation || false;
 });
 
 // Only show cancellation notice if there's a pending request (not yet submitted)
 const hasPendingCancellationRequest = computed(() => {
-	const cancellationRequest = bookingDetails.data?.cancellation_request;
-	const cancellationRequestedTickets = bookingDetails.data?.cancellation_requested_tickets || [];
+	const cancellationRequest = booking.value?.cancellation_request;
+	const cancellationRequestedTickets = booking.value?.cancellation_requested_tickets || [];
 
 	// Show notice only if there's a cancellation request AND there are tickets with pending cancellation
 	return cancellationRequest && cancellationRequestedTickets.length > 0;
@@ -222,7 +238,7 @@ const onCancellationRequestSuccess = (data) => {
 
 onMounted(() => {
 	// If redirected from successful payment, force a fresh load to bypass any cache
-	if (isPaymentSuccess) {
+	if (isPaymentSuccess.value) {
 		bookingDetails.reload();
 	}
 });
