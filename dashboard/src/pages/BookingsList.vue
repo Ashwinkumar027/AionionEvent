@@ -73,7 +73,7 @@ const bookings = useList({
 	orderBy: "creation desc",
 	realtime: true,
 	auto: true,
-	cacheKey: ["bookings-list", session.user],
+	cacheKey: "bookings-list",
 	onError: console.error,
 	transform(data) {
 		return data.map((booking) => ({

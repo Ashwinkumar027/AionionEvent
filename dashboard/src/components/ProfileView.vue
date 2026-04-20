@@ -89,7 +89,6 @@ const setUser = createResource({
 	},
 	onSuccess: () => {
 		error.value = "";
-		userResource.fetch();
 		toast.success(__("Profile updated successfully"));
 	},
 	onError: (err) => {
