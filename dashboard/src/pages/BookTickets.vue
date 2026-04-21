@@ -45,10 +45,6 @@
 				}}</Button>
 			</div>
 		</div>
-		<LoginRequired
-			v-else-if="!canAccessBookingPage && !eventBookingResource.loading"
-			:message="__('Please log in to book tickets for this event.')"
-		/>
 		<div v-else>
 			<BookingForm
 				v-if="eventBookingData.availableAddOns && eventBookingData.availableTicketTypes"
