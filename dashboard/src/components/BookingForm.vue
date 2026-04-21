@@ -102,8 +102,11 @@
 				</p>
 				<div class="space-y-3">
 					<p class="text-xs text-ink-gray-5">
-						{{ __("A confirmation with ticket details has been sent to your contact info.") }}
+						{{ __("Want to manage your bookings?") }}
 					</p>
+					<Button variant="outline" @click="redirectToLogin">
+						{{ __("Log in to your account") }}
+					</Button>
 				</div>
 			</div>
 		</div>
@@ -157,6 +160,7 @@
 								@blur="prefillAttendee('email')"
 							/>
 							<FormControl
+								v-if="props.eventDetails.guest_verification_method === 'Phone OTP'"
 								v-model="guestPhone"
 								type="tel"
 								:label="__('Phone Number')"
@@ -386,13 +390,7 @@
 							>
 								<div class="flex flex-col items-center gap-3 text-white">
 									<div class="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-									<span class="text-base font-medium">
-										{{
-											finalTotal > 0
-												? __("Initializing Payment...")
-												: __("Confirming Booking...")
-										}}
-									</span>
+									<span class="text-base font-medium">{{ __("Initializing Payment...") }}</span>
 								</div>
 							</div>
 
@@ -1271,7 +1269,7 @@ async function submit() {
 		utm_parameters: utmParameters.length > 0 ? utmParameters : null,
 		guest_email: props.isGuestMode ? guestEmail.value.trim() : null,
 		guest_full_name: props.isGuestMode ? guestFullName.value.trim() : null,
-		guest_phone: props.isGuestMode ? guestPhone.value.trim() : null,
+		guest_phone: props.isGuestMode && isPhoneOtp.value ? guestPhone.value.trim() : null,
 	};
 
 	if (props.isGuestMode) {
@@ -1292,7 +1290,7 @@ async function submit() {
 			toast.error(__("Please enter a valid email address"));
 			return;
 		}
-		if (props.isGuestMode && !guestPhone.value.trim()) {
+		if (isPhoneOtp.value && !guestPhone.value.trim()) {
 			toast.error(__("Please enter your phone number"));
 			return;
 		}

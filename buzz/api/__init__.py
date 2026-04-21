@@ -106,7 +106,7 @@ def verify_guest_otp(channel: str, identifier: str, otp: str):
 	tracker.add_success_attempt()
 
 
-def get_or_create_guest_user(email: str, full_name: str, phone: str | None = None) -> str:
+def get_or_create_guest_user(email: str, full_name: str) -> str:
 	email = email.lower().strip()
 
 	validate_email_address(email, throw=True)
@@ -128,8 +128,6 @@ def get_or_create_guest_user(email: str, full_name: str, phone: str | None = Non
 			"send_welcome_email": 0,
 		}
 	)
-	if phone:
-		user.mobile_no = phone
 	user.insert(ignore_permissions=True)
 
 	return email
@@ -284,8 +282,14 @@ def get_event_booking_data(event_route: str) -> dict:
 	else:
 		data.event_details = event_doc
 
-	# Guest booking is always allowed in this project
-	pass
+	if is_guest and not event_doc.allow_guest_booking:
+		data.available_ticket_types = []
+		data.available_add_ons = []
+		data.tax_settings = {}
+		data.custom_fields = []
+		data.payment_gateways = []
+		data.guest_booking_disabled = True
+		return data
 
 	available_ticket_types = []
 	published_ticket_types = frappe.db.get_all(
@@ -403,8 +407,8 @@ def process_booking(
 	is_guest = frappe.session.user == "Guest"
 
 	if is_guest:
-		# Allow guest booking regardless of event setting for this streamlined flow
-		pass
+		if not event_doc.allow_guest_booking:
+			frappe.throw(_("Please log in to access this feature"), frappe.AuthenticationError)
 
 		if not guest_email:
 			frappe.throw(_("Email is required for guest booking"))
@@ -429,7 +433,7 @@ def process_booking(
 		full_name = (guest_full_name or "").strip() or f"{first_name} {last_name}".strip()
 		if not full_name:
 			frappe.throw(_("Full name is required for guest booking"))
-		booking_user = get_or_create_guest_user(guest_email, full_name, guest_phone)
+		booking_user = get_or_create_guest_user(guest_email, full_name)
 	else:
 		booking_user = frappe.session.user
 
