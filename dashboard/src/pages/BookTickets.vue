@@ -44,6 +44,7 @@
 					__("Browse Other Events")
 				}}</Button>
 			</div>
+		</div>
 		<div
 			v-else-if="loadError && !eventBookingResource.loading"
 			class="flex flex-col items-center justify-center py-16 px-4"
