@@ -45,29 +45,24 @@
 				}}</Button>
 			</div>
 		</div>
-		<LoginRequired
-			v-else-if="!canAccessBookingPage && !eventBookingResource.loading"
-			:message="__('Please log in to book tickets for this event.')"
-		/>
 		<div v-else>
 			<BookingForm
 				v-if="eventBookingData.availableAddOns && eventBookingData.availableTicketTypes"
-				:availableAddOns="eventBookingData.availableAddOns"
-				:availableTicketTypes="eventBookingData.availableTicketTypes"
-				:taxSettings="eventBookingData.taxSettings"
-				:eventDetails="eventBookingData.eventDetails"
-				:customFields="eventBookingData.customFields"
-				:eventRoute="eventRoute"
-				:paymentGateways="eventBookingData.paymentGateways"
-				:isGuestMode="isGuest"
-				:offlineMethods="eventBookingData.offlineMethods"
+				:event-details="eventBookingData.event_details"
+				:available-ticket-types="eventBookingData.available_ticket_types"
+				:available-add-ons="eventBookingData.available_add_ons"
+				:tax-settings="eventBookingData.tax_settings"
+				:custom-fields="eventBookingData.custom_fields"
+				:payment-gateways="eventBookingData.payment_gateways"
+				:offline-payment-enabled="eventBookingData.offline_payment_enabled"
+				:offline-methods="eventBookingData.offline_methods"
+				:is-guest-mode="isGuest"
 			/>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import LoginRequired from "@/components/LoginRequired.vue";
 import { session } from "@/data/session";
 import { Spinner, createResource } from "frappe-ui";
 import { computed, reactive, ref } from "vue";
@@ -99,9 +94,7 @@ const goToHome = () => {
 	window.location.href = "/";
 };
 
-const canAccessBookingPage = computed(() => {
-	return session.isLoggedIn || eventBookingData.eventDetails?.allow_guest_booking;
-});
+
 
 const eventBookingResource = createResource({
 	url: "buzz.api.get_event_booking_data",
