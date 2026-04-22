@@ -187,16 +187,6 @@ defineExpose({ validate, clearError });
 .iti {
 	width: 100%;
 	display: block;
-	/* Prevent dial code/flag from showing over modals */
-	z-index: 0;
-}
-
-.iti__flag-container {
-	z-index: 1;
-}
-
-.iti__country-list {
-	z-index: 50;
 }
 
 .iti-phone-input {
