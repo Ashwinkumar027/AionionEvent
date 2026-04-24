@@ -41,6 +41,7 @@ const routes: RouteRecordRaw[] = [
 	},
 	{
 		path: "/bookings/:bookingId",
+		meta: { isPublic: true },
 		redirect: (to) => ({
 			name: "booking-details",
 			params: { bookingId: to.params.bookingId },
@@ -59,6 +60,7 @@ const routes: RouteRecordRaw[] = [
 	},
 	{
 		path: "/account",
+		meta: { isPublic: true },
 		component: () => import("@/pages/Account.vue"),
 		redirect: { name: "bookings-list" },
 		children: [
@@ -71,6 +73,7 @@ const routes: RouteRecordRaw[] = [
 				path: "bookings/:bookingId",
 				props: true,
 				name: "booking-details",
+				meta: { isPublic: true },
 				component: () => import("@/pages/BookingDetails.vue"),
 			},
 			{
