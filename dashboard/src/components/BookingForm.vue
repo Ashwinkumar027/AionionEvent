@@ -1649,9 +1649,14 @@ const submitButtonText = computed(() => {
 
 // ── PayU Bolt event handlers ─────────────────────────────────────────────────
 function onPayUSuccess({ bookingId }) {
-	showPayUBolt.value = false;
-	clearBookingCache();
-	router.replace(`/bookings/${bookingId}?success=true`);
+    showPayUBolt.value = false;
+    clearBookingCache();
+    if (isGuest.value) {
+        bookingSuccess.value = true;
+        successBookingName.value = bookingId;
+    } else {
+        router.replace(`/bookings/${bookingId}?success=true`);
+    }
 }
 
 function onPayUFailure({ message }) {
