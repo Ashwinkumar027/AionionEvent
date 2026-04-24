@@ -9,6 +9,7 @@
 			:booking-id="pendingPayUBookingId"
 			:payment-gateway="pendingPayUGateway"
 			:is-paid="isPaid"
+			:is-guest-mode="props.isGuestMode"
 			@payment-success="onPayUSuccess"
 			@payment-failure="onPayUFailure"
 			@close="showPayUBolt = false"

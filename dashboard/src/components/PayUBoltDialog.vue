@@ -122,6 +122,7 @@ const props = defineProps({
   bookingId: { type: String, required: true },
   paymentGateway: { type: String, default: null },
   isPaid: { type: Boolean, default: true },
+  isGuestMode: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["payment-success", "payment-failure", "close"]);
@@ -420,14 +421,16 @@ async function initPayment() {
               status:        "success",
               payu_response: response,
             });
-
+            
             if (result?.success) {
               state.value = "success";
               emit("payment-success", { bookingId: props.bookingId });
-              setTimeout(() => {
-                router.replace(`/bookings/${props.bookingId}?success=true`);
-              }, 1800);
-            } else {
+              if (!props.isGuestMode) {
+                  setTimeout(() => {
+                    router.replace(`/bookings/${props.bookingId}?success=true`);
+                  }, 1800);
+                }
+            }else {
               const msg = __("Payment could not be confirmed. Please contact support.");
               errorMessage.value = msg;
               state.value = "error";
