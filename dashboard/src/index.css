@@ -5,3 +5,24 @@
 [role="tablist"] {
 	gap: 1rem;
 }
+/* Fix phone input flag dropdown appearing over dialogs */
+.iti__dropdown-content {
+    z-index: 1000 !important;
+}
+
+.iti {
+    z-index: auto !important;
+}
+/* Fix intl-tel-input flag showing over dialogs */
+.iti--separate-dial-code {
+    z-index: auto !important;
+}
+
+.iti__selected-dial-code,
+.iti__selected-flag {
+    z-index: 1 !important;
+}
+
+.iti__dropdown-content {
+    z-index: 99999 !important;
+}

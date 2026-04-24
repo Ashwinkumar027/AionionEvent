@@ -46,8 +46,8 @@
 			</div>
 		</div>
 		<LoginRequired
-			v-else-if="!canAccessBookingPage && !eventBookingResource.loading"
-			:message="__('Please log in to book tickets for this event.')"
+    		v-else-if="!canAccessBookingPage && !eventBookingResource.loading && eventBookingData.eventDetails !== null"
+    		:message="__('Please log in to book tickets for this event.')"
 		/>
 		<div v-else>
 			<BookingForm
@@ -119,6 +119,7 @@ const eventBookingResource = createResource({
 			tax_percentage: 0,
 		};
 		eventBookingData.eventDetails = data.event_details || {};
+		console.log("EVENT DETAILS:", eventBookingData.eventDetails);
 		eventBookingData.customFields = data.custom_fields || [];
 		eventBookingData.paymentGateways = data.payment_gateways || [];
 		eventBookingData.offlineMethods = data.offline_methods || [];

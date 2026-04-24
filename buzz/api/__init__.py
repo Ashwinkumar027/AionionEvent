@@ -278,6 +278,9 @@ def get_event_booking_data(event_route: str) -> dict:
 			"guest_verification_method": event_doc.guest_verification_method,
 			"default_ticket_type": event_doc.default_ticket_type,
 			"max_attendees_per_booking": int(event_doc.max_attendees_per_booking or 1),
+			"terms_and_conditions": event_doc.get("terms_and_conditions") or "",
+			"refund_policy": event_doc.get("refund_policy") or "",
+			"cancellation_policy": event_doc.get("cancellation_policy") or "",
 		}
 	else:
 		data.event_details = event_doc
@@ -1553,7 +1556,7 @@ def _verify_payment_with_payu(merchant_key, merchant_salt, txnid, is_test):
 	return txn
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 @rate_limit(limit=10, seconds=60)
 def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -> dict:
 	"""

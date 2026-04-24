@@ -224,6 +224,55 @@
 							</button>
 						</div>
 					</div>
+
+					<!-- Terms & Conditions Section -->
+					<div
+						v-if="hasTerms"
+						class="mt-6 bg-surface-white border border-outline-gray-3 rounded-xl p-5 shadow-sm"
+					>
+						<div class="flex items-center gap-2 mb-4">
+							<LucideScrollText class="w-4 h-4 text-ink-gray-5 flex-shrink-0" />
+							<h3 class="text-sm font-semibold text-ink-gray-8">
+								{{ __("Things to Know") }}
+							</h3>
+						</div>
+
+						<!-- Terms & Conditions -->
+						<div v-if="props.eventDetails.terms_and_conditions">
+							<h4 class="text-xs font-semibold text-ink-gray-7 uppercase tracking-wide mb-2">
+								{{ __("Terms &amp; Conditions") }}
+							</h4>
+							<div
+								class="text-ink-gray-6"
+								v-html="props.eventDetails.terms_and_conditions"
+							/>
+						</div>
+
+						<!-- Refund Policy -->
+						<div v-if="props.eventDetails.refund_policy" class="mt-4 pt-4 border-t border-outline-gray-2">
+							<h4 class="text-xs font-semibold text-ink-gray-7 uppercase tracking-wide mb-2">
+								{{ __("Refund Policy") }}
+							</h4>
+							<div
+								class="text-ink-gray-6"
+								v-html="props.eventDetails.refund_policy"
+							/>
+						</div>
+
+						<!-- Cancellation Policy -->
+						<div
+							v-if="props.eventDetails.cancellation_policy"
+							class="mt-4 pt-4 border-t border-outline-gray-2"
+						>
+							<h4 class="text-xs font-semibold text-ink-gray-7 uppercase tracking-wide mb-2">
+								{{ __("Cancellation Policy") }}
+							</h4>
+							<div
+								class="text-ink-gray-6"
+								v-html="props.eventDetails.cancellation_policy"
+							/>
+						</div>
+					</div>
 				</div>
 
 				<!-- Right Side: Coupon, Summary and Submit -->
@@ -385,12 +434,12 @@
 						<div class="relative">
 							<!-- Full-screen overlay during initial processing ONLY -->
 							<div
-								v-if="processBooking.loading && !showPayUBolt"
+								v-if="processBooking.loading && !showPayUBolt && finalTotal > 0"
 								class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
 							>
 								<div class="flex flex-col items-center gap-3 text-white">
 									<div class="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-									<span class="text-base font-medium">{{ __("Initializing Payment...") }}</span>
+									<span class="text-base font-medium">{{ finalTotal > 0 ? __("Initializing Payment...") : __("Confirming Booking...") }}</span>
 								</div>
 							</div>
 
@@ -421,13 +470,38 @@
 						</div>
 
 						<div class="w-full">
+							<!-- I Agree Checkbox (only shown when terms exist) -->
+							<div
+								v-if="hasTerms"
+								class="mb-3 flex items-start gap-2.5 p-3 bg-surface-gray-1 border border-outline-gray-3 rounded-lg"
+							>
+								<input
+									id="accept-terms-checkbox"
+									v-model="acceptedTerms"
+									type="checkbox"
+									class="mt-0.5 w-4 h-4 rounded accent-ink-gray-9 cursor-pointer flex-shrink-0"
+								/>
+								<label
+									for="accept-terms-checkbox"
+									class="text-xs text-ink-gray-7 leading-relaxed cursor-pointer"
+								>
+									{{ __("I have read and agree to the Terms &amp; Conditions") }}
+									<span v-if="props.eventDetails.refund_policy">
+										{{ __(", Refund Policy") }}
+									</span>
+									<span v-if="props.eventDetails.cancellation_policy">
+										{{ __(", and Cancellation Policy") }}
+									</span>
+									{{ __("for this event.") }}
+								</label>
+							</div>
 							<Button
 								variant="solid"
 								size="lg"
 								class="w-full"
 								type="submit"
 								:loading="processBooking.loading || sendOtpResource.loading"
-								:disabled="showPayUBolt"
+								:disabled="showPayUBolt || (hasTerms && !acceptedTerms)"
 							>
 								{{ submitButtonText }}
 							</Button>
@@ -451,6 +525,7 @@ import LucideAlertCircle from "~icons/lucide/alert-circle";
 import LucideCheck from "~icons/lucide/check";
 import LucideCheckCircle from "~icons/lucide/check-circle";
 import LucideGift from "~icons/lucide/gift";
+import LucideScrollText from "~icons/lucide/scroll-text";
 import LucideX from "~icons/lucide/x";
 import AttendeeFormControl from "./AttendeeFormControl.vue";
 import BookingSummary from "./BookingSummary.vue";
@@ -596,6 +671,26 @@ const otpError = ref("");
 const pendingBookingPayload = ref(null);
 const resendCooldown = ref(0);
 let resendCooldownTimer = null;
+
+// Terms & Conditions acceptance state
+const acceptedTerms = ref(false);
+
+// Whether this event has any policy content
+const hasTerms = computed(() => {
+	return Boolean(
+		props.eventDetails?.terms_and_conditions ||
+		props.eventDetails?.refund_policy ||
+		props.eventDetails?.cancellation_policy
+	);
+});
+
+console.log("EVENT DETAILS:", props.eventDetails);
+
+// Reset acceptance when a different event's terms load
+watch(
+	() => props.eventDetails?.terms_and_conditions,
+	() => { acceptedTerms.value = false; }
+);
 
 onUnmounted(() => {
 	clearInterval(resendCooldownTimer);
@@ -1410,24 +1505,22 @@ function submitBooking(payload, paymentGateway, { isOtpFlow = false } = {}) {
 					window.location.href = data.payment_link;
 					return;
 				}
-
 				// Guest booking success
 				if (props.isGuestMode && !isPaid.value) {
-					router.replace(`/account/bookings/${data.booking_name}`);
+    				bookingSuccess.value = true;
+    				successBookingName.value = data.booking_name;
 				}
 				else if (props.isGuestMode) {
-					bookingSuccess.value = true;
-					successBookingName.value = data.booking_name;
+    				bookingSuccess.value = true;
+    				successBookingName.value = data.booking_name;
 				}
-
 				// Offline payment
 				else if (data.offline_payment) {
-					router.replace(`/bookings/${data.booking_name}?success=true&offline=true`);
+    				router.replace(`/bookings/${data.booking_name}?success=true&offline=true`);
 				}
-
 				// Free event
 				else {
-					router.replace(`/account/bookings/${data.booking_name}`);
+    				router.replace(`/bookings/${data.booking_name}?success=true`);
 				}
 			},
 

@@ -24,6 +24,9 @@
         "section_break_zukm",
         "short_description",
         "about",
+        "terms_and_conditions",
+        "refund_policy",
+        "cancellation_policy",
         "tab_2_tab",
         "schedule",
         "website_tab",
@@ -149,6 +152,21 @@
             "fieldname": "about",
             "fieldtype": "Text Editor",
             "label": "About"
+        },
+        {
+            "fieldname": "terms_and_conditions",
+            "fieldtype": "Text Editor",
+            "label": "Terms & Conditions"
+        },
+        {
+            "fieldname": "refund_policy",
+            "fieldtype": "Text Editor",
+            "label": "Refund Policy"
+        },
+        {
+            "fieldname": "cancellation_policy",
+            "fieldtype": "Text Editor",
+            "label": "Cancellation Policy"
         },
         {
             "fieldname": "start_time",

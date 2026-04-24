@@ -87,6 +87,7 @@ async function initIti() {
 		initialCountry: "in", // default to India – avoids slow geoIpLookup network call
 		separateDialCode: true,
 		formatOnDisplay: true,
+		dropdownContainer: document.body,
 		// No onlyCountries restriction – all countries allowed
 	});
 
