@@ -1651,7 +1651,7 @@ const submitButtonText = computed(() => {
 function onPayUSuccess({ bookingId }) {
     showPayUBolt.value = false;
     clearBookingCache();
-    if (isGuest.value) {
+    if (props.isGuestMode) {
         bookingSuccess.value = true;
         successBookingName.value = bookingId;
     } else {
