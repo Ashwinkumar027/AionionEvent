@@ -1662,7 +1662,7 @@ def get_payu_payment_data(booking_id: str, payment_gateway: str | None = None) -
 	return params
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def confirm_payu_payment(txnid, status, mihpayid=None, payu_response=None) -> dict:
 	"""
 	Final Production Grade Verification for PayU Bolt.
